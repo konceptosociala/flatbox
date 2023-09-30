@@ -1,14 +1,10 @@
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
+use flatbox_render::renderer::Renderer;
+
+pub struct Flatbox {
+    // pub world: World,
+    pub renderer: Renderer,
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
+impl Flatbox {
+    
 }
