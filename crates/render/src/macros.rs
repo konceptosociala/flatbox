@@ -1,7 +1,7 @@
-pub use crate::{gluint_wrapper, set_vertex_attribute};
+pub use crate::{glenum_wrapper, set_vertex_attribute};
 
 #[macro_export]
-macro_rules! gluint_wrapper {
+macro_rules! glenum_wrapper {
     {
         wrapper: $wrapper:ident,
         variants: [

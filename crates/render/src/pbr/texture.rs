@@ -3,9 +3,9 @@ use std::path::Path;
 use gl::types::{GLuint, GLenum};
 use image::{ImageError, EncodableLayout};
 
-use crate::macros::gluint_wrapper;
+use crate::macros::glenum_wrapper;
 
-gluint_wrapper! {
+glenum_wrapper! {
     wrapper: Filter,
     variants: [
         Linear,
@@ -41,10 +41,12 @@ impl Texture {
         let img = image::open(path)?.into_rgba8();
         gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, filter as i32);
         gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, filter as i32);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, gl::REPEAT as i32);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, gl::REPEAT as i32);
         gl::TexImage2D(
             gl::TEXTURE_2D,
             0,
-            gl::RGBA as i32,
+            gl::RGB as i32,
             img.width() as i32,
             img.height() as i32,
             0,

@@ -1,2 +1,2 @@
 pub mod transform;
-pub use nalgebra_glm::*;
+pub use nalgebra_glm as glm;

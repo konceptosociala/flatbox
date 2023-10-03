@@ -1,8 +1,9 @@
+use std::fmt::Debug;
 use gl::types::{GLuint, GLsizeiptr, GLint};
 
-use crate::macros::gluint_wrapper;
+use crate::macros::glenum_wrapper;
 
-gluint_wrapper! {
+glenum_wrapper! {
     wrapper: BufferTarget,
     variants: [
         ArrayBuffer, AtomicCounterBuffer, CopyReadBuffer,
@@ -14,20 +15,24 @@ gluint_wrapper! {
     ]
 }
 
-gluint_wrapper! {
+glenum_wrapper! {
     wrapper: BufferUsage,
     variants: [StreamDraw, StaticDraw, DynamicDraw]
 }
 
+#[readonly::make]
 pub struct Buffer {
     id: GLuint,
     target: GLuint,
     usage: GLuint,
+
+    __debug_target: BufferTarget,
+    __debug_usage: BufferUsage,
 }
 
 impl Buffer {
     pub fn new(target: BufferTarget, usage: BufferUsage) -> Buffer {
-        unsafe { Buffer::new_internal(target.into(), usage.into()) }
+        unsafe { Buffer::new_internal(target, usage) }
     }
 
     pub fn fill<T: Sized>(
@@ -50,11 +55,33 @@ impl Buffer {
         unsafe { gl::BindBuffer(self.target, self.id); }
     }
 
-    unsafe fn new_internal(target: GLuint, usage: GLuint) -> Buffer {
+    unsafe fn new_internal(target: BufferTarget, usage: BufferUsage) -> Buffer {
         let mut id: GLuint = 0;
         gl::GenBuffers(1, &mut id);
 
-        Buffer { id, target, usage }
+        Buffer {
+            id, 
+            target: target.into(), 
+            usage: usage.into(),
+            __debug_target: target,
+            __debug_usage: usage,
+        }
+    }
+}
+
+impl Default for Buffer {
+    fn default() -> Self {
+        Buffer::new(BufferTarget::ArrayBuffer, BufferUsage::StaticDraw)
+    }
+}
+
+impl Debug for Buffer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Buffer")
+            .field("id", &self.id)
+            .field("target", &self.__debug_target)
+            .field("usage", &self.__debug_usage)
+            .finish()
     }
 }
 
@@ -64,13 +91,14 @@ impl Drop for Buffer {
     }
 }
 
+#[readonly::make]
 pub struct VertexArray {
     id: GLuint,
 }
 
 impl VertexArray {
     pub fn new() -> VertexArray {
-        unsafe { VertexArray::new_internal() }
+        VertexArray::default()
     }
 
     pub fn bind(&self){
@@ -100,6 +128,20 @@ impl VertexArray {
         gl::GenVertexArrays(1, &mut id);
 
         VertexArray { id }
+    }
+}
+
+impl Debug for VertexArray {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("VertexArray")
+            .field(&self.id)
+            .finish()
+    }
+}
+
+impl Default for VertexArray {
+    fn default() -> Self {
+        unsafe { VertexArray::new_internal() }
     }
 }
 

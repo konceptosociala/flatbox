@@ -26,7 +26,7 @@ pub enum ShaderError {
     Utf8Error(#[from] FromUtf8Error),
 }
 
-gluint_wrapper! {
+glenum_wrapper! {
     wrapper: ShaderType,
     variants: [
         VertexShader,
@@ -88,13 +88,13 @@ impl Drop for Shader {
     }
 }
 
-pub struct ShaderProgram {
-    id: GLuint,
+pub struct GraphicsPipeline {
+    pub id: GLuint,
 }
 
-impl ShaderProgram {
-    pub fn new(shaders: &[Shader]) -> Result<ShaderProgram, ShaderError> {
-        unsafe { ShaderProgram::new_internal(shaders) }
+impl GraphicsPipeline {
+    pub fn new(shaders: &[Shader]) -> Result<GraphicsPipeline, ShaderError> {
+        unsafe { GraphicsPipeline::new_internal(shaders) }
     }
 
     pub fn set_int_uniform(&self, name: &str, value: i32) -> Result<(), ShaderError> {
@@ -119,8 +119,16 @@ impl ShaderProgram {
         Ok(unsafe { gl::GetAttribLocation(self.id, attribute.as_ptr()) as GLuint })
     }
 
-    unsafe fn new_internal(shaders: &[Shader]) -> Result<ShaderProgram, ShaderError> {
-        let program = ShaderProgram {
+    pub fn get_uniform_location(
+        &self,
+        uniform: &str,
+    ) -> Result<i32, ShaderError> {
+        let uniform = CString::new(uniform)?;
+        Ok(unsafe { gl::GetUniformLocation(self.id, uniform.as_ptr()) as GLint })
+    }
+
+    unsafe fn new_internal(shaders: &[Shader]) -> Result<GraphicsPipeline, ShaderError> {
+        let program = GraphicsPipeline {
             id: gl::CreateProgram()
         };
 
