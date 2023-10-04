@@ -13,17 +13,31 @@ glenum_wrapper! {
     ]
 }
 
+glenum_wrapper! {
+    wrapper: Order,
+    variants: [
+        Texture0, Texture1, Texture2, Texture3,
+        Texture4, Texture5, Texture6, Texture7,
+        Texture8, Texture9, Texture10, Texture11,
+        Texture12, Texture13, Texture14, Texture15,
+        Texture16, Texture17, Texture18, Texture19,
+        Texture20, Texture21, Texture22, Texture23,
+        Texture24, Texture25, Texture26, Texture27,
+        Texture28, Texture29, Texture30, Texture31
+    ]
+}
+
 pub struct Texture {
     id: GLuint,
 }
 
 impl Texture {
     pub fn new<P: AsRef<Path>>(path: P, filter: Filter) -> Result<Texture, ImageError> {
-        unsafe { Texture::new_internal(path, filter.into()) }
+        unsafe { Texture::new_internal(path, filter as u32) }
     }
 
-    pub fn activate(&self, unit: GLuint) {
-        unsafe { gl::ActiveTexture(unit); }
+    pub fn activate(&self, order: Order) {
+        unsafe { gl::ActiveTexture(order as u32); }
         self.bind();
     }
 

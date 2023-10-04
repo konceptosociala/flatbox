@@ -2,10 +2,6 @@ use std::fs::read_to_string;
 use std::path::Path;
 use std::ptr;
 use std::string::FromUtf8Error;
-use std::ffi::{
-    CString,
-    NulError,
-};
 
 use thiserror::Error;
 use gl::types::{GLuint, GLint};
@@ -20,8 +16,6 @@ pub enum ShaderError {
     IoError(#[from] std::io::Error),
     #[error("Shader linking error")]
     LinkingError(String),
-    #[error("Null byte error")]
-    NullByteError(#[from] NulError),
     #[error("Can't convert raw pointer to UTF-8 string")]
     Utf8Error(#[from] FromUtf8Error),
 }
@@ -46,11 +40,11 @@ impl Shader {
     }
 
     pub fn new_from_source(source_code: &str, shader_type: ShaderType) -> Result<Shader, ShaderError> {
-        unsafe { Shader::new_internal(source_code, shader_type.into()) }
+        unsafe { Shader::new_internal(source_code, shader_type as u32) }
     }
 
     unsafe fn new_internal(source_code: &str, shader_type: GLuint) -> Result<Shader, ShaderError> {
-        let source_code = CString::new(source_code)?;
+        let source_code = c_string!(source_code);
         let shader = Shader {
             id: gl::CreateShader(shader_type.into()),
         };
@@ -97,34 +91,25 @@ impl GraphicsPipeline {
         unsafe { GraphicsPipeline::new_internal(shaders) }
     }
 
-    pub fn set_int_uniform(&self, name: &str, value: i32) -> Result<(), ShaderError> {
+    pub fn set_int_uniform(&self, name: &str, value: i32) {
         self.apply();
         
-        let uniform = CString::new(name)?;
-        let location = unsafe { gl::GetUniformLocation(self.id, uniform.as_ptr()) };
+        let location = self.get_uniform_location(name);
         unsafe { gl::Uniform1i(location, value); }
-        
-        Ok(())
     }
 
     pub fn apply(&self){
         unsafe { gl::UseProgram(self.id); }
     }
 
-    pub fn get_attribute_location(
-        &self,
-        attribute: &str,
-    ) -> Result<u32, ShaderError> {
-        let attribute = CString::new(attribute)?;
-        Ok(unsafe { gl::GetAttribLocation(self.id, attribute.as_ptr()) as GLuint })
+    pub fn get_attribute_location(&self, attribute: &str) -> u32 {
+        let attribute = c_string!(attribute);
+        unsafe { gl::GetAttribLocation(self.id, attribute.as_ptr()) as GLuint }
     }
 
-    pub fn get_uniform_location(
-        &self,
-        uniform: &str,
-    ) -> Result<i32, ShaderError> {
-        let uniform = CString::new(uniform)?;
-        Ok(unsafe { gl::GetUniformLocation(self.id, uniform.as_ptr()) as GLint })
+    pub fn get_uniform_location(&self, uniform: &str) -> i32 {
+        let uniform = c_string!(uniform);
+        unsafe { gl::GetUniformLocation(self.id, uniform.as_ptr()) as GLint }
     }
 
     unsafe fn new_internal(shaders: &[Shader]) -> Result<GraphicsPipeline, ShaderError> {

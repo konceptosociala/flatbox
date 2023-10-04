@@ -61,8 +61,8 @@ impl Buffer {
 
         Buffer {
             id, 
-            target: target.into(), 
-            usage: usage.into(),
+            target: target as u32, 
+            usage: usage as u32,
             __debug_target: target,
             __debug_usage: usage,
         }

@@ -1,4 +1,4 @@
-pub use crate::{glenum_wrapper, set_vertex_attribute};
+pub use crate::{glenum_wrapper, set_vertex_attribute, c_string};
 
 #[macro_export]
 macro_rules! glenum_wrapper {
@@ -8,23 +8,24 @@ macro_rules! glenum_wrapper {
             $( $variant:ident ),+
         ]
     } => {
+        #[allow(unused_imports)]
+        use ::gl::*;
+
         #[derive(Clone, Copy, Debug)]
+        #[repr(u32)]
         pub enum $wrapper {
             $(
-                $variant,
+                $variant = ::casey::shouty!($variant),
             )+
         }
+    };
+}
 
-        impl From<$wrapper> for ::gl::types::GLuint {
-            fn from(value: $wrapper) -> ::gl::types::GLuint {
-                use ::gl::*;
-
-                match value {
-                    $(
-                        $wrapper::$variant => ::casey::shouty!($variant),
-                    )+
-                }
-            }
+#[macro_export]
+macro_rules! c_string {
+    ($lit:expr) => {
+        {
+            ::std::ffi::CString::new($lit).expect("Cannot create CString from literal")
         }
     };
 }

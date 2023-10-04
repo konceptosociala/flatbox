@@ -11,7 +11,7 @@ use crate::{
 pub type GraphicsPipelines = HashMap<TypeId, GraphicsPipeline>;
 
 pub struct Renderer {
-    graphics_pipelines: GraphicsPipelines,
+    _graphics_pipelines: GraphicsPipelines,
 }
 
 impl Renderer {
@@ -19,7 +19,7 @@ impl Renderer {
         gl::load_with(|ptr| init_function(ptr) );
 
         Renderer {
-            graphics_pipelines: GraphicsPipelines::new()
+            _graphics_pipelines: GraphicsPipelines::new()
         }
     }
 

@@ -1,10 +1,16 @@
 use std::path::PathBuf;
 use serde::{Serialize, Deserialize};
+use flatbox_assets::AssetHandle;
 // use flatbox_core::math::*;
 
 use crate::{
-    hal::buffer::{Buffer, VertexArray}, 
-    renderer::Renderer
+    macros::set_vertex_attribute,
+    hal::{
+        buffer::{Buffer, VertexArray, BufferTarget, BufferUsage}, 
+        shader::GraphicsPipeline
+    }, 
+    pbr::material::Material,
+    renderer::Renderer,
 };
 
 #[repr(C)]
@@ -13,6 +19,13 @@ pub struct Vertex {
     pub position: [f32; 3],
     pub normal: [f32; 3],
     pub texcoord: [f32; 2],
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct Primitive<M: Material> {
+    pub first_index: u32,
+    pub index_count: u32,
+    pub material: AssetHandle<M>,
 }
 
 /// Represents the type of mesh in [`Model`] struct.
@@ -42,31 +55,99 @@ pub enum MeshType {
 pub struct Mesh {
     pub vertex_data: Vec<Vertex>,
     pub index_data: Vec<u32>,
+    // pub primitives: Vec<Primitive>,
 
     #[serde(skip)]
-    pub(crate) vertex_array: Option<VertexArray>,
+    pub vertex_array: VertexArray,
     #[serde(skip)]
     pub(crate) vertex_buffer: Option<Buffer>,
     #[serde(skip)]
     pub(crate) index_buffer: Option<Buffer>,
 }
 
+const VERTICES: [Vertex; 24] = [
+    Vertex { position: [-0.5,0.5,-0.5], normal: [0.0, 0.0, 0.0], texcoord: [0.0, 0.0] },
+    Vertex { position: [-0.5,-0.5,-0.5], normal: [0.0, 0.0, 0.0], texcoord: [0.0, 1.0] },
+    Vertex { position: [0.5,-0.5,-0.5], normal: [0.0, 0.0, 0.0], texcoord: [1.0, 1.0] },
+    Vertex { position: [0.5,0.5,-0.5], normal: [0.0, 0.0, 0.0], texcoord: [1.0, 0.0] },
+
+    Vertex { position: [-0.5,0.5,0.5], normal: [0.0, 0.0, 0.0], texcoord: [0.0, 0.0] },
+    Vertex { position: [-0.5,-0.5,0.5], normal: [0.0, 0.0, 0.0], texcoord: [0.0, 1.0] },
+    Vertex { position: [0.5,-0.5,0.5], normal: [0.0, 0.0, 0.0], texcoord: [1.0, 1.0] },
+    Vertex { position: [0.5,0.5,0.5], normal: [0.0, 0.0, 0.0], texcoord: [1.0, 0.0] },
+
+    Vertex { position: [0.5,0.5,-0.5], normal: [0.0, 0.0, 0.0], texcoord: [0.0, 0.0] },
+    Vertex { position: [0.5,-0.5,-0.5], normal: [0.0, 0.0, 0.0], texcoord: [0.0, 1.0] },
+    Vertex { position: [0.5,-0.5,0.5], normal: [0.0, 0.0, 0.0], texcoord: [1.0, 1.0] },
+    Vertex { position: [0.5,0.5,0.5], normal: [0.0, 0.0, 0.0], texcoord: [1.0, 0.0] },
+
+    Vertex { position: [-0.5,0.5,-0.5], normal: [0.0, 0.0, 0.0], texcoord: [0.0, 0.0] },
+    Vertex { position: [-0.5,-0.5,-0.5], normal: [0.0, 0.0, 0.0], texcoord: [0.0, 1.0] },
+    Vertex { position: [-0.5,-0.5,0.5], normal: [0.0, 0.0, 0.0], texcoord: [1.0, 1.0] },
+    Vertex { position: [-0.5,0.5,0.5], normal: [0.0, 0.0, 0.0], texcoord: [1.0, 0.0] },
+
+    Vertex { position: [-0.5,0.5,0.5], normal: [0.0, 0.0, 0.0], texcoord: [0.0, 0.0] },
+    Vertex { position: [-0.5,0.5,-0.5], normal: [0.0, 0.0, 0.0], texcoord: [0.0, 1.0] },
+    Vertex { position: [0.5,0.5,-0.5], normal: [0.0, 0.0, 0.0], texcoord: [1.0, 1.0] },
+    Vertex { position: [0.5,0.5,0.5], normal: [0.0, 0.0, 0.0], texcoord: [1.0, 0.0] },
+
+    Vertex { position: [-0.5,-0.5,0.5], normal: [0.0, 0.0, 0.0], texcoord: [0.0, 0.0] },
+    Vertex { position: [-0.5,-0.5,-0.5], normal: [0.0, 0.0, 0.0], texcoord: [0.0, 1.0] },
+    Vertex { position: [0.5,-0.5,-0.5], normal: [0.0, 0.0, 0.0], texcoord: [1.0, 1.0] },
+    Vertex { position: [0.5,-0.5,0.5], normal: [0.0, 0.0, 0.0], texcoord: [1.0, 0.0] },
+];
+
+const INDICES: [u32; 36] = [
+    0,1,3, 3,1,2,
+    4,5,7, 7,5,6,
+    8,9,11, 11,9,10,
+    12,13,15, 15,13,14,
+    16,17,19, 19,17,18,
+    20,21,23, 23,21,22
+];
+
 impl Mesh {
-    pub fn new(vertices: &[Vertex], indices: &[u32]) -> Mesh {
+    pub fn new(vertices: &[Vertex], indices: &[u32], /*primitives: &[Primitive] */) -> Mesh {
         Mesh {
-            vertex_data: Vec::from(vertices),
-            index_data: Vec::from(indices),
-            vertex_array: None,
+            vertex_data: vertices.to_vec(),
+            index_data: indices.to_vec(),
+            // primitives: primitives.to_vec(),
+            vertex_array: VertexArray::new(),
             vertex_buffer: None,
             index_buffer: None,
         }
     }
-    
-    pub fn bind(&mut self, renderer: &Renderer) {
 
+    pub fn cube() -> Mesh {
+        Mesh::new(&VERTICES, &INDICES)
+    }
+    
+    pub fn setup(&mut self, pipeline: &GraphicsPipeline) {
+        self.vertex_buffer = Some(Buffer::new(BufferTarget::ArrayBuffer, BufferUsage::StaticDraw));
+        self.index_buffer = Some(Buffer::new(BufferTarget::ElementArrayBuffer, BufferUsage::StaticDraw));
+
+        self.update_vertices();
+
+        let position_attribute = pipeline.get_attribute_location("position");
+        let normal_attribute = pipeline.get_attribute_location("normal");
+        let texcoord_attribute = pipeline.get_attribute_location("texcoord");
+
+        let vertex_array = &self.vertex_array;
+        set_vertex_attribute!(vertex_array, position_attribute, Vertex::position);
+        set_vertex_attribute!(vertex_array, normal_attribute, Vertex::normal);
+        set_vertex_attribute!(vertex_array, texcoord_attribute, Vertex::texcoord);
     }
 
-    pub fn draw(&self, renderer: &Renderer) {
+    pub fn update_vertices(&self){     
+        self.vertex_array.bind();
+
+        if let (Some(ref vertex_buffer), Some(ref index_buffer)) = (&self.vertex_buffer, &self.index_buffer) {
+            vertex_buffer.fill(&self.vertex_data);
+            index_buffer.fill(&self.index_data);
+        }
+    }
+
+    pub fn draw(&self, _renderer: &Renderer) {
 
     }
 }
@@ -76,7 +157,8 @@ impl Clone for Mesh {
         Mesh {
             vertex_data: self.vertex_data.clone(),
             index_data: self.index_data.clone(),
-            vertex_array: None,
+            // primitives: self.primitives.clone(),
+            vertex_array: VertexArray::default(),
             vertex_buffer: None,
             index_buffer: None,
         }
