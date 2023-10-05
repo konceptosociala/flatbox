@@ -1,17 +1,24 @@
-use std::marker::PhantomData;
 use serde::{Serialize, Deserialize};
+use slotmap::{KeyData, Key};
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub struct AssetHandle<A> {
-    index: usize,
-    __phantom_data: PhantomData<A>
+pub mod error;
+pub mod manager;
+
+pub use tar;
+pub use lz4;
+pub use typetag;
+
+#[derive(Copy, Clone, Default, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Serialize, Deserialize)]
+pub struct AssetHandle(KeyData);
+
+impl From<KeyData> for AssetHandle {
+    fn from(value: KeyData) -> Self {
+        AssetHandle(value)
+    }
 }
 
-impl<A> AssetHandle<A> {
-    pub fn invalid() -> AssetHandle<A> {
-        AssetHandle { 
-            index: usize::MAX, 
-            __phantom_data: PhantomData
-        }
+unsafe impl Key for AssetHandle {
+    fn data(&self) -> KeyData {
+        self.0
     }
 }

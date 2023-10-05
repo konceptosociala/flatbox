@@ -9,7 +9,6 @@ use crate::{
         buffer::{Buffer, VertexArray, BufferTarget, BufferUsage}, 
         shader::GraphicsPipeline
     }, 
-    pbr::material::Material,
     renderer::Renderer,
 };
 
@@ -22,10 +21,10 @@ pub struct Vertex {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub struct Primitive<M: Material> {
+pub struct Primitive {
     pub first_index: u32,
     pub index_count: u32,
-    pub material: AssetHandle<M>,
+    pub material: AssetHandle,
 }
 
 /// Represents the type of mesh in [`Model`] struct.

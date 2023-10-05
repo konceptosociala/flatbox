@@ -1,14 +1,13 @@
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
-}
+pub mod event;
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+pub use hecs::{
+    *,
+    serialize::column::*,
+};
+pub use hecs_schedule::{
+    *, 
+    borrow::*,
+    Access, Batch, CommandBuffer, QueryOne,
+};
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+pub type Schedules<K> = std::collections::HashMap<K, ScheduleBuilder>;

@@ -5,6 +5,10 @@ edition = "2021"
 
 [dependencies]
 as-any = "0.3.1"
-atomic_refcell = "0.1.12"
-parking_lot = "0.12.1"
-serde = { version = "1.0.188", features = ["derive"] }
+parking_lot = { version = "0.12.0", features = ["serde"] }
+slotmap = { version = "1.0.6", features = ["serde"] }
+serde = { version = "1.0.137", features = ["derive", "rc"] }
+thiserror = "1.0.49"
+typetag = "0.2.13"
+tar = "0.4.40"
+lz4 = "1.24.0"

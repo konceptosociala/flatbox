@@ -17,5 +17,6 @@ members = [
 ]
 
 [dependencies]
+flatbox_assets = { path = "crates/assets", version = "0.1.0" }
 flatbox_render = { path = "crates/render", version = "0.1.0"}
 flatbox_ecs = { path = "crates/ecs", version = "0.1.0" }
