@@ -2,7 +2,11 @@ pub mod event;
 
 pub use hecs::{
     *,
-    serialize::column::*,
+    serialize::column::{
+        *,
+        deserialize as deserialize_world,
+        serialize as serialize_world,
+    },
 };
 pub use hecs_schedule::{
     *, 

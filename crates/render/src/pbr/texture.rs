@@ -1,9 +1,14 @@
 use std::path::Path;
 
+use flatbox_assets::{
+    manager::Asset,
+    typetag,
+};
 use gl::types::{GLuint, GLenum};
-use image::{ImageError, EncodableLayout};
+use image::EncodableLayout;
+use serde::{Serialize, Deserialize};
 
-use crate::macros::glenum_wrapper;
+use crate::{macros::glenum_wrapper, error::RenderError};
 
 glenum_wrapper! {
     wrapper: Filter,
@@ -27,12 +32,17 @@ glenum_wrapper! {
     ]
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct Texture {
+    // TODO: add texture type and raw image data
     id: GLuint,
 }
 
+#[typetag::serde]
+impl Asset for Texture {}
+
 impl Texture {
-    pub fn new<P: AsRef<Path>>(path: P, filter: Filter) -> Result<Texture, ImageError> {
+    pub fn new<P: AsRef<Path>>(path: P, filter: Filter) -> Result<Texture, RenderError> {
         unsafe { Texture::new_internal(path, filter as u32) }
     }
 
@@ -45,7 +55,7 @@ impl Texture {
         unsafe { gl::BindTexture(gl::TEXTURE_2D, self.id); }
     }
 
-    unsafe fn new_internal<P: AsRef<Path>>(path: P, filter: GLenum) -> Result<Texture, ImageError> {
+    unsafe fn new_internal<P: AsRef<Path>>(path: P, filter: GLenum) -> Result<Texture, RenderError> {
         let mut id: GLuint = 0;
         gl::GenTextures(1, &mut id);
 

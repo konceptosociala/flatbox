@@ -12,7 +12,7 @@ use crate::macros::*;
 pub enum ShaderError {
     #[error("Shader compilation error")]
     CompilationError(String),
-    #[error("I/O error")]
+    #[error("Shader I/O error")]
     IoError(#[from] std::io::Error),
     #[error("Shader linking error")]
     LinkingError(String),

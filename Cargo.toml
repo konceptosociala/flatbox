@@ -17,6 +17,10 @@ members = [
 ]
 
 [dependencies]
+thiserror = "1.0.49"
+
 flatbox_assets = { path = "crates/assets", version = "0.1.0" }
-flatbox_render = { path = "crates/render", version = "0.1.0"}
+flatbox_core = { path = "crates/core", version = "0.1.0" }
 flatbox_ecs = { path = "crates/ecs", version = "0.1.0" }
+flatbox_macros = { path = "crates/macros", version = "0.1.0" }
+flatbox_render = { path = "crates/render", version = "0.1.0"}

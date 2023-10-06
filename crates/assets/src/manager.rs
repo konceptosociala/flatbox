@@ -54,6 +54,14 @@ impl AssetManager {
         Err(AssetError::InvalidHandle)
     }
 
+    pub fn get_dynamic(&self, handle: AssetHandle) -> Result<RwLockReadGuard<Box<dyn Asset>>, AssetError> {
+        if let Some(asset) = self.cache.get(handle) {
+            return asset.try_read().ok_or(AssetError::AssetBlocked);  
+        }
+
+        Err(AssetError::InvalidHandle)
+    }
+
     pub fn remove<A: Asset>(&mut self, handle: AssetHandle) -> Option<A> {
         self.cache.remove(handle).and_then(|asset|{
             Arc::into_inner(asset).and_then(|lock| {

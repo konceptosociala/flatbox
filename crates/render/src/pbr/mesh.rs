@@ -24,6 +24,7 @@ pub struct Vertex {
 pub struct Primitive {
     pub first_index: u32,
     pub index_count: u32,
+    /// Handle of material, which is attached to rendered mesh primitive
     pub material: AssetHandle,
 }
 
@@ -54,7 +55,7 @@ pub enum MeshType {
 pub struct Mesh {
     pub vertex_data: Vec<Vertex>,
     pub index_data: Vec<u32>,
-    // pub primitives: Vec<Primitive>,
+    pub primitives: Vec<Primitive>,
 
     #[serde(skip)]
     pub vertex_array: VertexArray,
@@ -64,53 +65,12 @@ pub struct Mesh {
     pub(crate) index_buffer: Option<Buffer>,
 }
 
-const VERTICES: [Vertex; 24] = [
-    Vertex { position: [-0.5,0.5,-0.5], normal: [0.0, 0.0, 0.0], texcoord: [0.0, 0.0] },
-    Vertex { position: [-0.5,-0.5,-0.5], normal: [0.0, 0.0, 0.0], texcoord: [0.0, 1.0] },
-    Vertex { position: [0.5,-0.5,-0.5], normal: [0.0, 0.0, 0.0], texcoord: [1.0, 1.0] },
-    Vertex { position: [0.5,0.5,-0.5], normal: [0.0, 0.0, 0.0], texcoord: [1.0, 0.0] },
-
-    Vertex { position: [-0.5,0.5,0.5], normal: [0.0, 0.0, 0.0], texcoord: [0.0, 0.0] },
-    Vertex { position: [-0.5,-0.5,0.5], normal: [0.0, 0.0, 0.0], texcoord: [0.0, 1.0] },
-    Vertex { position: [0.5,-0.5,0.5], normal: [0.0, 0.0, 0.0], texcoord: [1.0, 1.0] },
-    Vertex { position: [0.5,0.5,0.5], normal: [0.0, 0.0, 0.0], texcoord: [1.0, 0.0] },
-
-    Vertex { position: [0.5,0.5,-0.5], normal: [0.0, 0.0, 0.0], texcoord: [0.0, 0.0] },
-    Vertex { position: [0.5,-0.5,-0.5], normal: [0.0, 0.0, 0.0], texcoord: [0.0, 1.0] },
-    Vertex { position: [0.5,-0.5,0.5], normal: [0.0, 0.0, 0.0], texcoord: [1.0, 1.0] },
-    Vertex { position: [0.5,0.5,0.5], normal: [0.0, 0.0, 0.0], texcoord: [1.0, 0.0] },
-
-    Vertex { position: [-0.5,0.5,-0.5], normal: [0.0, 0.0, 0.0], texcoord: [0.0, 0.0] },
-    Vertex { position: [-0.5,-0.5,-0.5], normal: [0.0, 0.0, 0.0], texcoord: [0.0, 1.0] },
-    Vertex { position: [-0.5,-0.5,0.5], normal: [0.0, 0.0, 0.0], texcoord: [1.0, 1.0] },
-    Vertex { position: [-0.5,0.5,0.5], normal: [0.0, 0.0, 0.0], texcoord: [1.0, 0.0] },
-
-    Vertex { position: [-0.5,0.5,0.5], normal: [0.0, 0.0, 0.0], texcoord: [0.0, 0.0] },
-    Vertex { position: [-0.5,0.5,-0.5], normal: [0.0, 0.0, 0.0], texcoord: [0.0, 1.0] },
-    Vertex { position: [0.5,0.5,-0.5], normal: [0.0, 0.0, 0.0], texcoord: [1.0, 1.0] },
-    Vertex { position: [0.5,0.5,0.5], normal: [0.0, 0.0, 0.0], texcoord: [1.0, 0.0] },
-
-    Vertex { position: [-0.5,-0.5,0.5], normal: [0.0, 0.0, 0.0], texcoord: [0.0, 0.0] },
-    Vertex { position: [-0.5,-0.5,-0.5], normal: [0.0, 0.0, 0.0], texcoord: [0.0, 1.0] },
-    Vertex { position: [0.5,-0.5,-0.5], normal: [0.0, 0.0, 0.0], texcoord: [1.0, 1.0] },
-    Vertex { position: [0.5,-0.5,0.5], normal: [0.0, 0.0, 0.0], texcoord: [1.0, 0.0] },
-];
-
-const INDICES: [u32; 36] = [
-    0,1,3, 3,1,2,
-    4,5,7, 7,5,6,
-    8,9,11, 11,9,10,
-    12,13,15, 15,13,14,
-    16,17,19, 19,17,18,
-    20,21,23, 23,21,22
-];
-
 impl Mesh {
-    pub fn new(vertices: &[Vertex], indices: &[u32], /*primitives: &[Primitive] */) -> Mesh {
+    pub fn new(vertices: &[Vertex], indices: &[u32], primitives: &[Primitive]) -> Mesh {
         Mesh {
             vertex_data: vertices.to_vec(),
             index_data: indices.to_vec(),
-            // primitives: primitives.to_vec(),
+            primitives: primitives.to_vec(),
             vertex_array: VertexArray::new(),
             vertex_buffer: None,
             index_buffer: None,
@@ -118,7 +78,48 @@ impl Mesh {
     }
 
     pub fn cube() -> Mesh {
-        Mesh::new(&VERTICES, &INDICES)
+        Mesh::new(
+            &[
+                Vertex { position: [-0.5,0.5,-0.5], normal: [0.0, 0.0, 0.0], texcoord: [0.0, 0.0] },
+                Vertex { position: [-0.5,-0.5,-0.5], normal: [0.0, 0.0, 0.0], texcoord: [0.0, 1.0] },
+                Vertex { position: [0.5,-0.5,-0.5], normal: [0.0, 0.0, 0.0], texcoord: [1.0, 1.0] },
+                Vertex { position: [0.5,0.5,-0.5], normal: [0.0, 0.0, 0.0], texcoord: [1.0, 0.0] },
+
+                Vertex { position: [-0.5,0.5,0.5], normal: [0.0, 0.0, 0.0], texcoord: [0.0, 0.0] },
+                Vertex { position: [-0.5,-0.5,0.5], normal: [0.0, 0.0, 0.0], texcoord: [0.0, 1.0] },
+                Vertex { position: [0.5,-0.5,0.5], normal: [0.0, 0.0, 0.0], texcoord: [1.0, 1.0] },
+                Vertex { position: [0.5,0.5,0.5], normal: [0.0, 0.0, 0.0], texcoord: [1.0, 0.0] },
+
+                Vertex { position: [0.5,0.5,-0.5], normal: [0.0, 0.0, 0.0], texcoord: [0.0, 0.0] },
+                Vertex { position: [0.5,-0.5,-0.5], normal: [0.0, 0.0, 0.0], texcoord: [0.0, 1.0] },
+                Vertex { position: [0.5,-0.5,0.5], normal: [0.0, 0.0, 0.0], texcoord: [1.0, 1.0] },
+                Vertex { position: [0.5,0.5,0.5], normal: [0.0, 0.0, 0.0], texcoord: [1.0, 0.0] },
+
+                Vertex { position: [-0.5,0.5,-0.5], normal: [0.0, 0.0, 0.0], texcoord: [0.0, 0.0] },
+                Vertex { position: [-0.5,-0.5,-0.5], normal: [0.0, 0.0, 0.0], texcoord: [0.0, 1.0] },
+                Vertex { position: [-0.5,-0.5,0.5], normal: [0.0, 0.0, 0.0], texcoord: [1.0, 1.0] },
+                Vertex { position: [-0.5,0.5,0.5], normal: [0.0, 0.0, 0.0], texcoord: [1.0, 0.0] },
+
+                Vertex { position: [-0.5,0.5,0.5], normal: [0.0, 0.0, 0.0], texcoord: [0.0, 0.0] },
+                Vertex { position: [-0.5,0.5,-0.5], normal: [0.0, 0.0, 0.0], texcoord: [0.0, 1.0] },
+                Vertex { position: [0.5,0.5,-0.5], normal: [0.0, 0.0, 0.0], texcoord: [1.0, 1.0] },
+                Vertex { position: [0.5,0.5,0.5], normal: [0.0, 0.0, 0.0], texcoord: [1.0, 0.0] },
+
+                Vertex { position: [-0.5,-0.5,0.5], normal: [0.0, 0.0, 0.0], texcoord: [0.0, 0.0] },
+                Vertex { position: [-0.5,-0.5,-0.5], normal: [0.0, 0.0, 0.0], texcoord: [0.0, 1.0] },
+                Vertex { position: [0.5,-0.5,-0.5], normal: [0.0, 0.0, 0.0], texcoord: [1.0, 1.0] },
+                Vertex { position: [0.5,-0.5,0.5], normal: [0.0, 0.0, 0.0], texcoord: [1.0, 0.0] },
+            ],
+            &[
+                0,1,3, 3,1,2,
+                4,5,7, 7,5,6,
+                8,9,11, 11,9,10,
+                12,13,15, 15,13,14,
+                16,17,19, 19,17,18,
+                20,21,23, 23,21,22
+            ],
+            &[],
+        )
     }
     
     pub fn setup(&mut self, pipeline: &GraphicsPipeline) {
@@ -156,7 +157,7 @@ impl Clone for Mesh {
         Mesh {
             vertex_data: self.vertex_data.clone(),
             index_data: self.index_data.clone(),
-            // primitives: self.primitives.clone(),
+            primitives: self.primitives.clone(),
             vertex_array: VertexArray::default(),
             vertex_buffer: None,
             index_buffer: None,

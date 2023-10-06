@@ -1,10 +1,10 @@
 use glutin::{
+    platform::run_return::EventLoopExtRunReturn,
     event_loop::{EventLoop, ControlFlow}, 
     window::{Window, Icon, WindowBuilder as GlutinWindowBuilder},
     dpi::{Size, LogicalSize},
     ContextWrapper, PossiblyCurrent, ContextBuilder, GlRequest, Api, event::{Event, WindowEvent},
 };
-use flatbox_core::math::glm;
 
 #[derive(Default)]
 pub enum EventLoopWrapper {
@@ -73,8 +73,8 @@ impl Context {
         self.ctx.get_proc_address(addr)
     }
 
-    pub fn run<F: FnMut() + 'static>(mut self, mut runner: F) -> ! {
-        self.event_loop.take().run(move |event, _, control_flow|{
+    pub fn run<F: FnMut()>(&mut self, mut runner: F) {
+        self.event_loop.take().run_return(move |event, _, control_flow|{
             *control_flow = ControlFlow::Wait;
     
             match event {
@@ -114,8 +114,6 @@ pub struct WindowBuilder {
     pub icon: Option<Icon>,
     /// Specifies whether the logger must be initialized
     pub init_logger: bool,
-    /// Window clear background color:
-    pub clear_color: glm::Vec3,
 }
 
 impl Default for WindowBuilder {
@@ -129,7 +127,6 @@ impl Default for WindowBuilder {
             resizable: true, 
             icon: None, 
             init_logger: true, 
-            clear_color: glm::vec3(0.1, 0.1, 0.1), 
         }
     }
 }
