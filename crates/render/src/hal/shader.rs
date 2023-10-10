@@ -5,6 +5,7 @@ use std::string::FromUtf8Error;
 
 use thiserror::Error;
 use gl::types::{GLuint, GLint};
+use flatbox_core::math::glm;
 
 use crate::macros::*;
 
@@ -46,7 +47,7 @@ impl Shader {
     unsafe fn new_internal(source_code: &str, shader_type: GLuint) -> Result<Shader, ShaderError> {
         let source_code = c_string!(source_code);
         let shader = Shader {
-            id: gl::CreateShader(shader_type.into()),
+            id: gl::CreateShader(shader_type),
         };
 
         gl::ShaderSource(shader.id, 1, &source_code.as_ptr(), ptr::null());
@@ -91,15 +92,53 @@ impl GraphicsPipeline {
         unsafe { GraphicsPipeline::new_internal(shaders) }
     }
 
-    pub fn set_int_uniform(&self, name: &str, value: i32) {
-        self.apply();
-        
+    pub fn apply(&self){
+        unsafe { gl::UseProgram(self.id); }
+    }
+
+    pub fn set_bool(&self, name: &str, value: bool) {        
+        let location = self.get_uniform_location(name);
+        unsafe { gl::Uniform1i(location, value as i32); }
+    }
+
+    pub fn set_int(&self, name: &str, value: i32) {
         let location = self.get_uniform_location(name);
         unsafe { gl::Uniform1i(location, value); }
     }
 
-    pub fn apply(&self){
-        unsafe { gl::UseProgram(self.id); }
+    pub fn set_float(&self, name: &str, value: f32) {        
+        let location = self.get_uniform_location(name);
+        unsafe { gl::Uniform1f(location, value); }
+    }
+
+    pub fn set_vec2(&self, name: &str, value: &glm::Vec2) {
+        let location = self.get_uniform_location(name);
+        unsafe { gl::Uniform2fv(location, 1, glm::value_ptr(value).as_ptr()); }
+    }
+
+    pub fn set_vec3(&self, name: &str, value: &glm::Vec3) {        
+        let location = self.get_uniform_location(name);
+        unsafe { gl::Uniform3fv(location, 1, glm::value_ptr(value).as_ptr()); }
+    }
+
+    pub fn set_vec4(&self, name: &str, value: &glm::Vec4) {        
+        let location = self.get_uniform_location(name);
+        unsafe { gl::Uniform4fv(location, 1, glm::value_ptr(value).as_ptr()); }
+    }
+
+    pub fn set_mat2(&self, name: &str, value: &glm::Mat2) {        
+        let location = self.get_uniform_location(name);
+        unsafe { gl::UniformMatrix2fv(location, 1, gl::FALSE, glm::value_ptr(value).as_ptr()); }
+    }
+
+    pub fn set_mat3(&self, name: &str, value: &glm::Mat3) {        
+        let location = self.get_uniform_location(name);
+        unsafe { gl::UniformMatrix3fv(location, 1, gl::FALSE, glm::value_ptr(value).as_ptr()); }
+    }
+
+    pub fn set_mat4(&self, name: &str, value: &glm::Mat4) {        
+        let location = self.get_uniform_location(name);
+        unsafe { gl::UniformMatrix4fv(location, 1, gl::FALSE, glm::value_ptr(value).as_ptr()); }
     }
 
     pub fn get_attribute_location(&self, attribute: &str) -> u32 {

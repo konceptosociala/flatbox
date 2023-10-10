@@ -29,7 +29,7 @@ impl EventHandler {
     pub fn push_writer<E: Event>(&mut self) -> EventReader<E> {
         let (tx, rx) = flume::unbounded();
         self.writers.insert(TypeId::of::<E>(), Box::new(EventWriter::new(tx)));
-        return EventReader::new(rx);
+        EventReader::new(rx)
     }
 }
 

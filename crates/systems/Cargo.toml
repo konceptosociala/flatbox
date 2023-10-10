@@ -1,0 +1,11 @@
+[package]
+name = "flatbox_systems"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.75"
+flatbox_assets = { version = "0.1.0", path = "../assets" }
+flatbox_core = { version = "0.1.0", path = "../core" }
+flatbox_ecs = { version = "0.1.0", path = "../ecs" }
+flatbox_render = { version = "0.1.0", path = "../render" }

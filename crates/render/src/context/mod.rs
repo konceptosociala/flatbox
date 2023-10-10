@@ -25,10 +25,10 @@ impl EventLoopWrapper {
     pub fn take(&mut self) -> EventLoop<()> {
         let event_loop = std::mem::take(self);
         *self = EventLoopWrapper::NotPresent;
-        return match event_loop {
+        match event_loop {
             Self::NotPresent => panic!("EventLoop is not present"),
             Self::Present(e) => e,
-        };
+        }
     }
 }
 
@@ -86,7 +86,7 @@ impl Context {
                 },
                 Event::RedrawRequested(_) => {
                     (runner)();
-    
+        
                     self.ctx.swap_buffers().unwrap();
                     self.ctx.window().request_redraw();
                 },

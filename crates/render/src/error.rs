@@ -9,4 +9,6 @@ pub enum RenderError {
     ImageProcessing(#[from] ImageError),
     #[error("Error processing shaders")]
     ShaderProcessing(#[from] ShaderError),
+    #[error("Material not bound: {0}")]
+    MaterialNotBound(String),
 }

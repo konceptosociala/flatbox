@@ -24,3 +24,13 @@ flatbox_core = { path = "crates/core", version = "0.1.0" }
 flatbox_ecs = { path = "crates/ecs", version = "0.1.0" }
 flatbox_macros = { path = "crates/macros", version = "0.1.0" }
 flatbox_render = { path = "crates/render", version = "0.1.0"}
+flatbox_systems = { path = "crates/systems", version = "0.1.0" }
+
+[dev-dependencies]
+anyhow = "1.0.75"
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3

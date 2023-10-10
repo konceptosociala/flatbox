@@ -105,6 +105,10 @@ impl VertexArray {
         unsafe { gl::BindVertexArray(self.id); }
     }
 
+    /// set attribute
+    /// 
+    /// ## Safety
+    /// 
     pub unsafe fn set_attribute<V: Sized>(
         &self,
         attrib_pos: u32,

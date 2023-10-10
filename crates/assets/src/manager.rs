@@ -62,17 +62,7 @@ impl AssetManager {
         Err(AssetError::InvalidHandle)
     }
 
-    pub fn remove<A: Asset>(&mut self, handle: AssetHandle) -> Option<A> {
-        self.cache.remove(handle).and_then(|asset|{
-            Arc::into_inner(asset).and_then(|lock| {
-                let mut boxed = RwLock::into_inner(lock);
-                return (*boxed).as_any_mut().downcast_mut::<A>().and_then(|dc|{
-                    let mut dummy = unsafe { std::mem::zeroed() };
-                    std::mem::swap(dc, &mut dummy);
-
-                    Some(dummy)
-                });
-            })
-        })
+    pub fn remove<A: Asset>(&mut self, handle: AssetHandle) {
+        self.cache.remove(handle);
     }
 }

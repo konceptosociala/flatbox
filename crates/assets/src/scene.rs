@@ -58,7 +58,7 @@ impl Scene {
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self, AssetError> {     
         Ok(ron::from_str::<Scene>(
             &read_to_string(path)?
-        ).map_err(|e| RonError::from(e))?)
+        ).map_err(RonError::from)?)
     }
     
     pub fn save<P: AsRef<std::path::Path>>(&self, path: P) -> Result<(), AssetError> {     
@@ -66,9 +66,9 @@ impl Scene {
         let mut ser = Serializer::new(buf, Some(
             PrettyConfig::new()
                 .struct_names(true)
-        )).map_err(|e| RonError::from(e))?;   
+        )).map_err(RonError::from)?;   
         
-        self.serialize(&mut ser).map_err(|e| RonError::from(e))?;
+        self.serialize(&mut ser).map_err(RonError::from)?;
                         
         Ok(())
     }

@@ -9,6 +9,30 @@ use flatbox_render::{
 pub mod error;
 pub mod prelude;
 
+pub mod assets {
+    pub use flatbox_assets::*;
+}
+
+pub mod core {
+    pub use flatbox_core::*;
+}
+
+pub mod ecs {
+    pub use flatbox_ecs::*;
+}
+
+pub mod macros {
+    pub use flatbox_macros::*;
+}
+
+pub mod render {
+    pub use flatbox_render::*;
+}
+
+pub mod systems {
+    pub use flatbox_systems::*;
+}
+
 pub struct Flatbox {
     pub assets: AssetManager,
     pub world: World,

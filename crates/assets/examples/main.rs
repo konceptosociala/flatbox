@@ -12,8 +12,4 @@ fn main() {
     let handle = assets.insert(MyAsset);
 
     println!("`get()`: {:#?}", assets.get::<MyAsset>(handle).unwrap());
-
-    let asset: MyAsset = assets.remove(handle).unwrap();
-
-    println!("`remove()`: {asset:#?}");
 }

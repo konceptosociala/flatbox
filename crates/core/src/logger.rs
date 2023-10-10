@@ -11,6 +11,16 @@ use log::{Metadata, Record, Log, LevelFilter, SetLoggerError};
 
 pub use log::{info, error, warn, debug, trace, Level};
 
+#[derive(Debug)]
+pub enum LoggerLevel {
+    Error,
+    Warning,
+    Info,
+    Debug,
+    Trace,
+    None,
+}
+
 pub struct FlatboxLogger {
     log_level: Level,
 }
@@ -21,7 +31,7 @@ impl FlatboxLogger {
     }
 
     pub fn try_init() -> Result<(), SetLoggerError> {
-        log::set_boxed_logger(Box::new(FlatboxLogger::default()))?;
+        log::set_boxed_logger(Box::<FlatboxLogger>::default())?;
         #[cfg(not(debug_assertions))]
         log::set_max_level(LevelFilter::Info);
         #[cfg(debug_assertions)]

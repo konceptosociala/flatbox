@@ -1,17 +1,23 @@
-use std::{collections::HashMap, any::type_name};
+use std::collections::hash_map::{HashMap, Entry};
+use std::any::type_name;
 use std::any::TypeId;
 
+use flatbox_core::math::transform::Transform;
 use flatbox_core::{
     logger::error,
     math::glm,
 };
 
 use crate::{
+    error::RenderError,
     hal::{
         shader::{GraphicsPipeline, Shader, ShaderType},
         GlInitFunction,
     },
-    pbr::material::Material,
+    pbr::{
+        material::Material,
+        model::Model,
+    },
 };
 
 pub type GraphicsPipelines = HashMap<TypeId, GraphicsPipeline>;
@@ -22,8 +28,8 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    pub fn init<F: GlInitFunction>(mut init_function: F) -> Renderer {
-        gl::load_with(|ptr| init_function(ptr) );
+    pub fn init<F: GlInitFunction>(init_function: F) -> Renderer {
+        gl::load_with(init_function);
 
         unsafe {
             gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
@@ -37,6 +43,10 @@ impl Renderer {
         }
     }
 
+    pub fn get_pipeline<M: Material>(&self) -> Result<&GraphicsPipeline, RenderError> {
+        self.graphics_pipelines.get(&TypeId::of::<M>()).ok_or(RenderError::MaterialNotBound(type_name::<M>().to_string()))
+    }
+
     pub fn bind_material<M: Material>(&mut self) {
         let vertex_shader = Shader::new_from_source(M::vertex_shader(), ShaderType::VertexShader)
             .expect("Cannot compile vertex shader");
@@ -47,29 +57,102 @@ impl Renderer {
         let material_type = TypeId::of::<M>();
         let pipeline = GraphicsPipeline::new(&[vertex_shader, fragment_shader]).expect("Cannot initialize graphics pipeline");
 
-        if self.graphics_pipelines.contains_key(&material_type) {
-            error!("Material type `{}` is already bound", type_name::<M>());
+        if let Entry::Vacant(e) = self.graphics_pipelines.entry(material_type) {
+            e.insert(pipeline);
         } else {
-            self.graphics_pipelines.insert(material_type, pipeline);
+            error!("Material type `{}` is already bound", type_name::<M>());
         }
     }
 
-    pub fn clear(&self) {
+    pub fn execute(&mut self, command: &mut dyn RenderCommand) -> Result<(), RenderError> {
+        command.execute(self)
+    }
+}
+
+pub trait RenderCommand {
+    fn execute(&mut self, renderer: &mut Renderer) -> Result<(), RenderError>;
+}
+
+#[derive(Debug)]
+pub struct ClearCommand;
+
+impl RenderCommand for ClearCommand {
+    fn execute(&mut self, renderer: &mut Renderer) -> Result<(), RenderError> {
         unsafe {
-            gl::ClearColor(self.clear_color.x, self.clear_color.y, self.clear_color.z, 1.0);
+            gl::ClearColor(renderer.clear_color.x, renderer.clear_color.y, renderer.clear_color.z, 1.0);
             gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
         }
-    }
 
-    pub fn render(
-        &self,
-    ){
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
+pub struct PrepareModelCommand<'a, M> {
+    model: &'a mut Model,
+    material: &'a M,
+}
+
+impl<'a, M: Material> PrepareModelCommand<'a, M> {
+    pub fn new(model: &'a mut Model, material: &'a M) -> PrepareModelCommand<'a, M> {
+        Self { model, material }
+    }
+}
+
+impl<'a, M: Material> RenderCommand for PrepareModelCommand<'a, M> {
+    fn execute(&mut self, renderer: &mut Renderer) -> Result<(), RenderError> {
+        let Some(ref mut mesh) = self.model.mesh else { return Ok(()) };
+
+        let pipeline = renderer.get_pipeline::<M>()?;
+        mesh.setup(pipeline);
+        pipeline.apply();
+        self.material.setup_pipeline(pipeline);
+
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
+pub struct DrawModelCommand<'a, M> {
+    model: &'a Model,
+    material: &'a M,
+    transform: &'a Transform,
+}
+
+impl<'a, M: Material> DrawModelCommand<'a, M> {
+    pub fn new(
+        model: &'a Model, 
+        material: &'a M,
+        transform: &'a Transform,
+    ) -> DrawModelCommand<'a, M> {
+        Self { model, material, transform }
+    }
+}
+
+impl<'a, M: Material> RenderCommand for DrawModelCommand<'a, M> {
+    fn execute(&mut self, renderer: &mut Renderer) -> Result<(), RenderError> {
+        let Some(ref mesh) = self.model.mesh else { return Ok(()) };
+
+        let pipeline = renderer.get_pipeline::<M>()?;
+
+        self.material.process_pipeline(pipeline);
+        
+        let model = self.transform.to_matrix();
+        let mut view = glm::Mat4::identity();
+        view = glm::translate(&view, &glm::vec3(0.0, 0.0, -3.0));
+        let projection = glm::perspective(45.0f32.to_radians(), 800.0 / 600.0, 0.1, 100.0);
+        
+        pipeline.apply();
+        pipeline.set_mat4("model", &model);
+        pipeline.set_mat4("view", &view);
+        pipeline.set_mat4("projection", &projection);
+    
+        mesh.vertex_array.bind();
+
         unsafe {
             gl::DrawElements(gl::TRIANGLES, 36, gl::UNSIGNED_INT, std::ptr::null());
         }
-    }
 
-    pub fn push_uniform_matrix(&self, location: i32, matrix: &glm::Mat4) {
-        unsafe { gl::UniformMatrix4fv(location as i32, 1, gl::FALSE, glm::value_ptr(&matrix).as_ptr()); }
+        Ok(())
     }
 }

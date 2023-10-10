@@ -1,7 +1,6 @@
 use std::path::PathBuf;
 use serde::{Serialize, Deserialize};
 use flatbox_assets::AssetHandle;
-// use flatbox_core::math::*;
 
 use crate::{
     macros::set_vertex_attribute,
@@ -123,6 +122,10 @@ impl Mesh {
     }
     
     pub fn setup(&mut self, pipeline: &GraphicsPipeline) {
+        if self.vertex_buffer.is_some() && self.index_buffer.is_some() {
+            return;
+        }
+
         self.vertex_buffer = Some(Buffer::new(BufferTarget::ArrayBuffer, BufferUsage::StaticDraw));
         self.index_buffer = Some(Buffer::new(BufferTarget::ElementArrayBuffer, BufferUsage::StaticDraw));
 
