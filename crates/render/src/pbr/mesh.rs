@@ -8,7 +8,6 @@ use crate::{
         buffer::{Buffer, VertexArray, BufferTarget, BufferUsage}, 
         shader::GraphicsPipeline
     }, 
-    renderer::Renderer,
 };
 
 #[repr(C)]
@@ -57,7 +56,9 @@ pub struct Mesh {
     pub primitives: Vec<Primitive>,
 
     #[serde(skip)]
-    pub vertex_array: VertexArray,
+    pub(crate) prepared: bool,
+    #[serde(skip)]
+    pub(crate) vertex_array: VertexArray,
     #[serde(skip)]
     pub(crate) vertex_buffer: Option<Buffer>,
     #[serde(skip)]
@@ -70,6 +71,7 @@ impl Mesh {
             vertex_data: vertices.to_vec(),
             index_data: indices.to_vec(),
             primitives: primitives.to_vec(),
+            prepared: false,
             vertex_array: VertexArray::new(),
             vertex_buffer: None,
             index_buffer: None,
@@ -149,10 +151,6 @@ impl Mesh {
             index_buffer.fill(&self.index_data);
         }
     }
-
-    pub fn draw(&self, _renderer: &Renderer) {
-
-    }
 }
 
 impl Clone for Mesh {
@@ -161,6 +159,7 @@ impl Clone for Mesh {
             vertex_data: self.vertex_data.clone(),
             index_data: self.index_data.clone(),
             primitives: self.primitives.clone(),
+            prepared: false,
             vertex_array: VertexArray::default(),
             vertex_buffer: None,
             index_buffer: None,

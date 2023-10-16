@@ -11,6 +11,7 @@ use flatbox_render::{
 
 pub fn clear_screen(mut renderer: Write<Renderer>) -> Result<()> {
     renderer.execute(&mut ClearCommand)?;
+    
     Ok(())
 }
 

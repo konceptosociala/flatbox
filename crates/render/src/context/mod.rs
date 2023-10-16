@@ -1,3 +1,10 @@
+use std::time::{Instant, Duration};
+
+/*
+ * Based on `game-loop` (c) tuzz
+ * Licensed under MIT License
+ */
+use flatbox_core::logger::LoggerLevel;
 use glutin::{
     platform::run_return::EventLoopExtRunReturn,
     event_loop::{EventLoop, ControlFlow}, 
@@ -32,9 +39,28 @@ impl EventLoopWrapper {
     }
 }
 
+pub enum ContextEvent {
+    UpdateEvent,
+    RenderEvent,
+}
+
 pub struct Context {
     event_loop: EventLoopWrapper,
     ctx: ContextWrapper<PossiblyCurrent, Window>,
+    pub updates_per_second: u32,
+    pub max_frame_time: Duration,
+    pub exit_next_iteration: bool,
+    pub window_occluded: bool,
+
+    fixed_time_step: f64,
+    number_of_updates: u32,
+    number_of_renders: u32,
+    last_frame_time: f64,
+    running_time: f64,
+    accumulated_time: f64,
+    blending_factor: f64,
+    previous_instant: Instant,
+    current_instant: Instant,
 }
 
 impl Context {
@@ -66,6 +92,20 @@ impl Context {
         Context {
             event_loop: EventLoopWrapper::new(event_loop),
             ctx: gl_context,
+            updates_per_second: builder.updates_per_second,
+            max_frame_time: Duration::from_secs_f64(builder.max_frame_time),
+            window_occluded: false,
+            exit_next_iteration: false,
+
+            fixed_time_step: 1.0 / builder.updates_per_second as f64,
+            number_of_updates: 0,
+            number_of_renders: 0,
+            running_time: 0.0,
+            accumulated_time: 0.0,
+            blending_factor: 0.0,
+            previous_instant: Instant::now(),
+            current_instant: Instant::now(),
+            last_frame_time: 0.0,
         }
     }
 
@@ -73,21 +113,57 @@ impl Context {
         self.ctx.get_proc_address(addr)
     }
 
-    pub fn run<F: FnMut()>(&mut self, mut runner: F) {
-        self.event_loop.take().run_return(move |event, _, control_flow|{
-            *control_flow = ControlFlow::Wait;
-    
+    pub fn next_frame<F: FnMut(ContextEvent)>(&mut self, mut runner: F) -> bool {
+        if self.exit_next_iteration { return false; }
+
+        self.current_instant = Instant::now();
+
+        let mut elapsed = self.current_instant.duration_since(self.previous_instant);
+        if elapsed > self.max_frame_time { elapsed = self.max_frame_time; }
+
+        self.last_frame_time = elapsed.as_secs_f64();
+        self.running_time += elapsed.as_secs_f64();
+        self.accumulated_time += elapsed.as_secs_f64();
+
+        while self.accumulated_time >= self.fixed_time_step {
+            (runner)(ContextEvent::UpdateEvent);
+
+            self.accumulated_time -= self.fixed_time_step;
+            self.number_of_updates += 1;
+        }
+
+        self.blending_factor = self.accumulated_time / self.fixed_time_step;
+
+        if self.window_occluded {
+            std::thread::sleep(Duration::from_secs_f64(self.fixed_time_step));
+        } else {
+            (runner)(ContextEvent::RenderEvent);
+            self.number_of_renders += 1;
+        }
+
+        self.previous_instant = self.current_instant;
+
+        true
+    }
+
+    pub fn run<F: FnMut(ContextEvent)>(&mut self, mut runner: F) {
+        self.event_loop.take().run_return(move |event, _, control_flow|{  
             match event {
                 Event::LoopDestroyed => (),
                 Event::WindowEvent { event, .. } => match event {
                     WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
                     WindowEvent::Resized(physical_size) => self.ctx.resize(physical_size),
+                    WindowEvent::Occluded(occluded) => self.window_occluded = occluded,
                     _ => {},
                 },
                 Event::RedrawRequested(_) => {
-                    (runner)();
-        
+                    if !self.next_frame(&mut runner) {
+                        *control_flow = ControlFlow::Exit;
+                    }
+
                     self.ctx.swap_buffers().unwrap();
+                },
+                Event::MainEventsCleared => {
                     self.ctx.window().request_redraw();
                 },
                 _ => {},
@@ -112,8 +188,12 @@ pub struct WindowBuilder {
     pub resizable: bool,
     /// Icon of the winit window. Requires feature `render` enabled
     pub icon: Option<Icon>,
-    /// Specifies whether the logger must be initialized
-    pub init_logger: bool,
+    /// Specifies logger level and whether it must be initialized
+    pub logger_level: LoggerLevel,
+    ///
+    pub updates_per_second: u32, 
+    ///
+    pub max_frame_time: f64
 }
 
 impl Default for WindowBuilder {
@@ -126,7 +206,12 @@ impl Default for WindowBuilder {
             maximized: false, 
             resizable: true, 
             icon: None, 
-            init_logger: true, 
+            #[cfg(not(debug_assertions))]
+            logger_level: LoggerLevel::Info, 
+            #[cfg(debug_assertions)]
+            logger_level: LoggerLevel::Debug,
+            updates_per_second: 240,
+            max_frame_time: 0.1,
         }
     }
 }

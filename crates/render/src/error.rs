@@ -11,4 +11,6 @@ pub enum RenderError {
     ShaderProcessing(#[from] ShaderError),
     #[error("Material not bound: {0}")]
     MaterialNotBound(String),
+    #[error("Model is not prepared for drawing. Before `DrawModelCommand` call `PrepareModelCommand` first")]
+    ModelNotPrepared,
 }

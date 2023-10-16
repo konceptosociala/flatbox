@@ -1,6 +1,7 @@
-use std::{sync::Arc, any::type_name};
+use std::sync::Arc;
 use as_any::AsAny;
 use parking_lot::{RwLock, MappedRwLockWriteGuard, RwLockWriteGuard, MappedRwLockReadGuard, RwLockReadGuard};
+use pretty_type_name::pretty_type_name;
 use serde::{Serialize, Deserialize};
 use slotmap::SlotMap;
 
@@ -33,7 +34,7 @@ impl AssetManager {
             
             return RwLockReadGuard::try_map(data, |data| {
                 (**data).as_any().downcast_ref::<A>()
-            }).map_err(|_| AssetError::WrongAssetType { asset_type: type_name::<A>().to_string() });
+            }).map_err(|_| AssetError::WrongAssetType { asset_type: pretty_type_name::<A>().to_string() });
         }
 
         Err(AssetError::InvalidHandle)
@@ -48,7 +49,7 @@ impl AssetManager {
             
             return RwLockWriteGuard::try_map(data, |data| {
                 (**data).as_any_mut().downcast_mut::<A>()
-            }).map_err(|_| AssetError::WrongAssetType { asset_type: type_name::<A>().to_string() });
+            }).map_err(|_| AssetError::WrongAssetType { asset_type: pretty_type_name::<A>().to_string() });
         }
 
         Err(AssetError::InvalidHandle)

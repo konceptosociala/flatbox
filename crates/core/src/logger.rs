@@ -11,7 +11,7 @@ use log::{Metadata, Record, Log, LevelFilter, SetLoggerError};
 
 pub use log::{info, error, warn, debug, trace, Level};
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub enum LoggerLevel {
     Error,
     Warning,
@@ -19,6 +19,19 @@ pub enum LoggerLevel {
     Debug,
     Trace,
     None,
+}
+
+impl From<LoggerLevel> for Option<Level> {
+    fn from(value: LoggerLevel) -> Self {
+        match value {
+            LoggerLevel::Debug => Some(Level::Debug),
+            LoggerLevel::Error => Some(Level::Error),
+            LoggerLevel::Info => Some(Level::Info),
+            LoggerLevel::Trace => Some(Level::Trace),
+            LoggerLevel::Warning => Some(Level::Warn),
+            LoggerLevel::None => None,
+        }
+    }
 }
 
 pub struct FlatboxLogger {
@@ -40,13 +53,15 @@ impl FlatboxLogger {
         Ok(())
     }
 
-    pub fn init_with_level(log_level: Level){
-        FlatboxLogger::try_init_with_level(log_level).expect("Failed to set logger with level");
+    pub fn init_with_level(logger_level: LoggerLevel){
+        FlatboxLogger::try_init_with_level(logger_level).expect("Failed to set logger with level");
     }
 
-    pub fn try_init_with_level(log_level: Level) -> Result<(), SetLoggerError> {
-        log::set_boxed_logger(Box::new(FlatboxLogger { log_level }))?;
-        log::set_max_level(log_level.to_level_filter());
+    pub fn try_init_with_level(logger_level: LoggerLevel) -> Result<(), SetLoggerError> {
+        if let Some(log_level) = logger_level.into() {
+            log::set_boxed_logger(Box::new(FlatboxLogger { log_level }))?;
+            log::set_max_level(log_level.to_level_filter());
+        }
 
         Ok(())
     }

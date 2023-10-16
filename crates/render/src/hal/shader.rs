@@ -102,6 +102,7 @@ impl GraphicsPipeline {
     }
 
     pub fn set_int(&self, name: &str, value: i32) {
+        self.apply();
         let location = self.get_uniform_location(name);
         unsafe { gl::Uniform1i(location, value); }
     }

@@ -1,22 +1,26 @@
+use anyhow::Result;
 use flatbox::{
-    Flatbox, 
-    error::FlatboxResult
-};
-use flatbox_core::math::transform::Transform;
-use flatbox_ecs::{Write, CommandBuffer};
-use flatbox_render::{
-    hal::shader::*,
-    pbr::{
-        texture::{
-            Texture,
-            Filter, Order,
-        },
-        material::Material, model::Model,
+    Flatbox,
+    error::FlatboxResult,
+    core::math::{
+        transform::Transform,
+        glm,
     },
-    renderer::*, 
-    context::*,
+    ecs::{Write, CommandBuffer, SubWorld, With},
+    render::{
+        hal::shader::*,
+        pbr::{
+            texture::{
+                Texture,
+                Filter, Order,
+            },
+            material::Material, model::Model,
+        },
+        renderer::*, 
+        context::*,
+    },
+    extension::{RenderMaterialExtension, ClearScreenExtension},
 };
-use flatbox_systems::rendering::*;
 
 fn main() {
     Flatbox::init(WindowBuilder {
@@ -25,11 +29,12 @@ fn main() {
         height: 800,
         ..Default::default()
     })
+        .add_extension(ClearScreenExtension)
+        .add_extension(RenderMaterialExtension::<MyMaterial>::new())
+        
         .add_setup_system(setup)
-        .add_system(clear_screen)
-        .add_system(render_material::<MyMaterial>)
+        .add_system(rotate)
         .run();
-
 }
 
 pub struct MyMaterial {
@@ -61,15 +66,15 @@ impl Material for MyMaterial {
     }
 
     fn setup_pipeline(&self, pipeline: &GraphicsPipeline) {
-        pipeline.set_int("rustTexture", 0);
-        pipeline.set_int("wallTexture", 1);   
+        pipeline.set_int("material.rustTexture", 0);
+        pipeline.set_int("material.wallTexture", 1);
     }
 }
 
 fn setup(
     mut renderer: Write<Renderer>,
     mut cmd: Write<CommandBuffer>,
-) -> FlatboxResult<()> {
+) -> Result<()> {
     renderer.bind_material::<MyMaterial>();
 
     cmd.spawn((
@@ -79,4 +84,12 @@ fn setup(
     ));
 
     Ok(())
+}
+
+fn rotate(
+    world: SubWorld<With<&mut Transform, &Model>>
+) {
+    for (_, mut transform) in &mut world.query::<With<&mut Transform, &Model>>() {
+        transform.rotation = glm::quat_rotate(&transform.rotation, 0.1f32.to_radians(), &glm::vec3(1.0, 1.0, 1.0))
+    }
 }

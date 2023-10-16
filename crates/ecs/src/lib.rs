@@ -14,4 +14,4 @@ pub use hecs_schedule::{
     Access, Batch, CommandBuffer, QueryOne,
 };
 
-pub type Schedules<K> = std::collections::HashMap<K, ScheduleBuilder>;
+pub type Schedules = std::collections::HashMap<&'static str, ScheduleBuilder>;

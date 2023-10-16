@@ -3,11 +3,15 @@ out vec4 FragColor;
 
 in vec2 textureCoordinate;
 
-uniform sampler2D rustTexture;
-uniform sampler2D wallTexture;
+struct DefaultMaterial {
+    sampler2D rustTexture;
+    sampler2D wallTexture;
+};
+
+uniform DefaultMaterial material;
 
 void main() {
-    vec4 color0 = texture(rustTexture, textureCoordinate);
-    vec4 color1 = texture(wallTexture, textureCoordinate);
+    vec4 color0 = texture(material.rustTexture, textureCoordinate);
+    vec4 color1 = texture(material.wallTexture, textureCoordinate);
     FragColor = color1;
 }

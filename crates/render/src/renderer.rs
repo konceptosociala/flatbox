@@ -1,5 +1,4 @@
 use std::collections::hash_map::{HashMap, Entry};
-use std::any::type_name;
 use std::any::TypeId;
 
 use flatbox_core::math::transform::Transform;
@@ -7,6 +6,7 @@ use flatbox_core::{
     logger::error,
     math::glm,
 };
+use pretty_type_name::pretty_type_name;
 
 use crate::{
     error::RenderError,
@@ -23,8 +23,8 @@ use crate::{
 pub type GraphicsPipelines = HashMap<TypeId, GraphicsPipeline>;
 
 pub struct Renderer {
-    pub graphics_pipelines: GraphicsPipelines,
-    pub clear_color: glm::Vec3,
+    graphics_pipelines: GraphicsPipelines,
+    clear_color: glm::Vec3,
 }
 
 impl Renderer {
@@ -32,8 +32,8 @@ impl Renderer {
         gl::load_with(init_function);
 
         unsafe {
-            gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
             gl::Enable(gl::BLEND);
+            gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
             gl::Enable(gl::DEPTH_TEST);  
         }
 
@@ -43,8 +43,12 @@ impl Renderer {
         }
     }
 
+    pub fn set_clear_color(&mut self, color: glm::Vec3) {
+        self.clear_color = color;
+    }
+
     pub fn get_pipeline<M: Material>(&self) -> Result<&GraphicsPipeline, RenderError> {
-        self.graphics_pipelines.get(&TypeId::of::<M>()).ok_or(RenderError::MaterialNotBound(type_name::<M>().to_string()))
+        self.graphics_pipelines.get(&TypeId::of::<M>()).ok_or(RenderError::MaterialNotBound(pretty_type_name::<M>().to_string()))
     }
 
     pub fn bind_material<M: Material>(&mut self) {
@@ -60,7 +64,7 @@ impl Renderer {
         if let Entry::Vacant(e) = self.graphics_pipelines.entry(material_type) {
             e.insert(pipeline);
         } else {
-            error!("Material type `{}` is already bound", type_name::<M>());
+            error!("Material type `{}` is already bound", pretty_type_name::<M>());
         }
     }
 
@@ -105,8 +109,11 @@ impl<'a, M: Material> RenderCommand for PrepareModelCommand<'a, M> {
 
         let pipeline = renderer.get_pipeline::<M>()?;
         mesh.setup(pipeline);
+
         pipeline.apply();
         self.material.setup_pipeline(pipeline);
+
+        mesh.prepared = true;
 
         Ok(())
     }
@@ -133,6 +140,10 @@ impl<'a, M: Material> RenderCommand for DrawModelCommand<'a, M> {
     fn execute(&mut self, renderer: &mut Renderer) -> Result<(), RenderError> {
         let Some(ref mesh) = self.model.mesh else { return Ok(()) };
 
+        if !mesh.prepared {
+            return Err(RenderError::ModelNotPrepared);
+        }
+
         let pipeline = renderer.get_pipeline::<M>()?;
 
         self.material.process_pipeline(pipeline);
@@ -150,7 +161,7 @@ impl<'a, M: Material> RenderCommand for DrawModelCommand<'a, M> {
         mesh.vertex_array.bind();
 
         unsafe {
-            gl::DrawElements(gl::TRIANGLES, 36, gl::UNSIGNED_INT, std::ptr::null());
+            gl::DrawElements(gl::TRIANGLES, mesh.index_data.len() as i32, gl::UNSIGNED_INT, std::ptr::null());
         }
 
         Ok(())

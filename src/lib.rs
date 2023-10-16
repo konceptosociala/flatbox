@@ -1,12 +1,17 @@
+use std::any::TypeId;
 use flatbox_assets::manager::AssetManager;
 use flatbox_core::logger::FlatboxLogger;
 use flatbox_ecs::{World, Schedules, Schedule, System};
 use flatbox_render::{
     renderer::Renderer,
-    context::{Context, WindowBuilder},
+    context::{Context, WindowBuilder, ContextEvent},
 };
 
+use extension::{Extension, Extensions};
+use pretty_type_name::pretty_type_name;
+
 pub mod error;
+pub mod extension;
 pub mod prelude;
 
 pub mod assets {
@@ -36,7 +41,8 @@ pub mod systems {
 pub struct Flatbox {
     pub assets: AssetManager,
     pub world: World,
-    pub schedules: Schedules<&'static str>,
+    pub schedules: Schedules,
+    pub extensions: Extensions,
     pub context: Context,
     pub renderer: Renderer,
     pub window_builder: WindowBuilder,
@@ -44,9 +50,7 @@ pub struct Flatbox {
 
 impl Flatbox {
     pub fn init(window_builder: WindowBuilder) -> Flatbox {
-        if window_builder.init_logger {
-            FlatboxLogger::init();
-        }
+        FlatboxLogger::init_with_level(window_builder.logger_level);
 
         let context = Context::new(&window_builder);
         let renderer = Renderer::init(|addr| context.get_proc_address(addr));
@@ -57,7 +61,9 @@ impl Flatbox {
             schedules: Schedules::from([
                 ("setup", Schedule::builder()),
                 ("update", Schedule::builder()),
+                ("render", Schedule::builder()),
             ]),
+            extensions: Extensions::new(),
             context,
             renderer,
             window_builder,
@@ -82,6 +88,14 @@ impl Flatbox {
         self
     }
 
+    pub fn add_render_system<Args, Ret, S>(&mut self, system: S) -> &mut Self 
+    where
+        S: 'static + System<Args, Ret> + Send,
+    {
+        self.schedules.get_mut("render").unwrap().add_system(system);
+        self
+    }
+
     pub fn flush_setup_systems(&mut self) -> &mut Self {
         self.schedules.get_mut("setup").unwrap().flush();
         self
@@ -92,7 +106,27 @@ impl Flatbox {
         self
     }
 
+    pub fn flush_render_systems(&mut self) -> &mut Self {
+        self.schedules.get_mut("render").unwrap().flush();
+        self
+    }
+
+    pub fn add_extension<E: Extension + 'static>(&mut self, extension: E) -> &mut Self {
+        if self.extensions.insert(TypeId::of::<E>(), Box::new(extension)).is_some() {
+            panic!("Extension `{}` is already added!", pretty_type_name::<E>());
+        }
+
+        self
+    }
+
     pub fn run(&mut self){
+        let extensions = std::mem::take(&mut self.extensions);
+
+        for ext in extensions.values() {
+            ext.apply(self);
+        }
+
+        let mut render_schedule = self.schedules.get_mut("render").unwrap().build();
         let mut setup_schedule = self.schedules.get_mut("setup").unwrap().build();
         let mut update_schedule = self.schedules.get_mut("update").unwrap().build();
 
@@ -102,12 +136,23 @@ impl Flatbox {
             &mut self.assets,
         )).expect("Cannot execute setup systems");
 
-        self.context.run(||{
-            update_schedule.execute((
-                &mut self.world,
-                &mut self.renderer,
-                &mut self.assets,
-            )).expect("Cannot execute update systems");
+        self.context.run(|event|{
+            match event {
+                ContextEvent::UpdateEvent => {
+                    update_schedule.execute((
+                        &mut self.world,
+                        &mut self.renderer,
+                        &mut self.assets,
+                    )).expect("Cannot execute update systems");
+                },
+                ContextEvent::RenderEvent => {
+                    render_schedule.execute_seq((
+                        &mut self.world,
+                        &mut self.renderer,
+                        &mut self.assets,
+                    )).expect("Cannot execute render systems");
+                },
+            }
         });
     }
 }

@@ -17,6 +17,8 @@ members = [
 ]
 
 [dependencies]
+indexmap = "2.0.2"
+pretty-type-name = "1.0.1"
 thiserror = "1.0.49"
 
 flatbox_assets = { path = "crates/assets", version = "0.1.0" }
