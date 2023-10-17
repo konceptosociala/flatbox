@@ -9,12 +9,20 @@ pub struct Transform {
 }
 
 impl Transform {
+    pub fn new(translation: glm::Vec3, rotation: glm::Quat, scale: f32) -> Transform {
+        Transform { translation, rotation, scale }
+    }
+
     pub fn identity() -> Transform {
-        Transform {
-            translation: glm::Vec3::identity(),
-            rotation: glm::Quat::identity(),
-            scale: 1.0,
-        }
+        Transform::default()
+    }
+
+    pub fn new_from_translation(translation: glm::Vec3) -> Transform {
+        Transform { translation, ..Default::default() }
+    }
+
+    pub fn new_from_rotation(rotation: glm::Quat) -> Transform {
+        Transform { rotation, ..Default::default() }
     }
 
     pub fn to_matrix(&self) -> glm::Mat4 {
@@ -22,5 +30,15 @@ impl Transform {
             * glm::translation(&self.translation)
             * glm::quat_cast(&self.rotation)
             * glm::scaling(&glm::vec3(self.scale, self.scale, self.scale))
+    }
+}
+
+impl Default for Transform {
+    fn default() -> Self {
+        Transform {
+            translation: glm::vec3(0.0, 0.0, 0.0),
+            rotation: glm::Quat::identity(),
+            scale: 1.0,
+        }
     }
 }

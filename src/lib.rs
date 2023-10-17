@@ -1,14 +1,15 @@
 use std::any::TypeId;
+use pretty_type_name::pretty_type_name;
 use flatbox_assets::manager::AssetManager;
 use flatbox_core::logger::FlatboxLogger;
 use flatbox_ecs::{World, Schedules, Schedule, System};
 use flatbox_render::{
     renderer::Renderer,
-    context::{Context, WindowBuilder, ContextEvent},
+    context::{Context, WindowBuilder, ContextEvent}, 
+    pbr::material::DefaultMaterial,
 };
 
-use extension::{Extension, Extensions};
-use pretty_type_name::pretty_type_name;
+use crate::extension::{Extension, Extensions, RenderMaterialExtension, BaseRenderExtension};
 
 pub mod error;
 pub mod extension;
@@ -119,6 +120,12 @@ impl Flatbox {
         self
     }
 
+    pub fn add_default_extensions(&mut self) -> &mut Self {
+        self
+            .add_extension(BaseRenderExtension)
+            .add_extension(RenderMaterialExtension::<DefaultMaterial>::new())
+    }
+
     pub fn run(&mut self){
         let extensions = std::mem::take(&mut self.extensions);
 
@@ -130,7 +137,7 @@ impl Flatbox {
         let mut setup_schedule = self.schedules.get_mut("setup").unwrap().build();
         let mut update_schedule = self.schedules.get_mut("update").unwrap().build();
 
-        setup_schedule.execute((
+        setup_schedule.execute_seq((
             &mut self.world,
             &mut self.renderer,
             &mut self.assets,
@@ -138,6 +145,9 @@ impl Flatbox {
 
         self.context.run(|event|{
             match event {
+                ContextEvent::ResizeEvent(extent) => {
+                    self.renderer.set_extent(extent);
+                },
                 ContextEvent::UpdateEvent => {
                     update_schedule.execute((
                         &mut self.world,

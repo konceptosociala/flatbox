@@ -14,24 +14,24 @@ use flatbox::{
                 Texture,
                 Filter, Order,
             },
-            material::Material, model::Model,
+            material::Material, 
+            model::Model,
+            camera::Camera,
         },
-        renderer::*, 
         context::*,
     },
-    extension::{RenderMaterialExtension, ClearScreenExtension},
+    extension::RenderMaterialExtension,
 };
 
 fn main() {
     Flatbox::init(WindowBuilder {
         title:  "Learn OpenGL with Rust",
         width:  800,
-        height: 800,
+        height: 600,
         ..Default::default()
     })
-        .add_extension(ClearScreenExtension)
-        .add_extension(RenderMaterialExtension::<MyMaterial>::new())
-        
+        .add_default_extensions() 
+        .add_extension(RenderMaterialExtension::<MyMaterial>::new())      
         .add_setup_system(setup)
         .add_system(rotate)
         .run();
@@ -71,24 +71,24 @@ impl Material for MyMaterial {
     }
 }
 
-fn setup(
-    mut renderer: Write<Renderer>,
-    mut cmd: Write<CommandBuffer>,
-) -> Result<()> {
-    renderer.bind_material::<MyMaterial>();
-
+fn setup(mut cmd: Write<CommandBuffer>) -> Result<()> {
     cmd.spawn((
         Model::cube(), 
         MyMaterial::new("assets/rust.png", "assets/wall.jpg")?,
         Transform::identity(),
     ));
 
+    cmd.spawn((
+        Camera::builder()
+            .is_active(true)
+            .build(),
+        Transform::new_from_translation(glm::vec3(0.0, 0.0, -3.0)),
+    ));
+
     Ok(())
 }
 
-fn rotate(
-    world: SubWorld<With<&mut Transform, &Model>>
-) {
+fn rotate(world: SubWorld<With<&mut Transform, &Model>>) {
     for (_, mut transform) in &mut world.query::<With<&mut Transform, &Model>>() {
         transform.rotation = glm::quat_rotate(&transform.rotation, 0.1f32.to_radians(), &glm::vec3(1.0, 1.0, 1.0))
     }

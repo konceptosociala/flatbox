@@ -2,11 +2,11 @@ use std::marker::PhantomData;
 use std::any::TypeId;
 use std::fmt::Debug;
 use flatbox_render::pbr::material::Material;
-use flatbox_systems::rendering::{render_material, clear_screen};
+use flatbox_systems::rendering::{render_material, clear_screen, bind_material};
 use indexmap::IndexMap;
 
 use crate::Flatbox;
-
+ 
 pub trait Extension: Debug {
     fn apply(&self, app: &mut Flatbox);
 }
@@ -14,9 +14,9 @@ pub trait Extension: Debug {
 pub type Extensions = IndexMap<TypeId, Box<dyn Extension>>;
 
 #[derive(Default, Debug)]
-pub struct ClearScreenExtension;
+pub struct BaseRenderExtension;
 
-impl Extension for ClearScreenExtension {
+impl Extension for BaseRenderExtension {
     fn apply(&self, app: &mut Flatbox) {
         app
             .add_render_system(clear_screen);
@@ -40,6 +40,7 @@ impl<M: Material> RenderMaterialExtension<M> {
 impl<M: Material> Extension for RenderMaterialExtension<M> {
     fn apply(&self, app: &mut Flatbox) {
         app
+            .add_setup_system(bind_material::<M>)
             .add_render_system(render_material::<M>);
     }
 }

@@ -4,9 +4,9 @@ use flatbox_ecs::{SubWorld, Write};
 use flatbox_render::{
     pbr::{
         material::Material, 
-        model::Model,
+        model::Model, camera::Camera,
     }, 
-    renderer::{Renderer, PrepareModelCommand, DrawModelCommand, ClearCommand}
+    renderer::{Renderer, PrepareModelCommand, DrawModelCommand, ClearCommand, RenderCameraCommand}, error::RenderError
 };
 
 pub fn clear_screen(mut renderer: Write<Renderer>) -> Result<()> {
@@ -15,13 +15,31 @@ pub fn clear_screen(mut renderer: Write<Renderer>) -> Result<()> {
     Ok(())
 }
 
+pub fn bind_material<M: Material>(mut renderer: Write<Renderer>) {
+    renderer.bind_material::<M>();
+}
+
 pub fn render_material<M: Material>(
-    world: SubWorld<(&mut Model, &M, &Transform)>,
+    model_world: SubWorld<(&mut Model, &M, &Transform)>,
+    camera_world: SubWorld<(&mut Camera, &Transform)>,
     mut renderer: Write<Renderer>,
 ) -> Result<()> {
-    for (_, (mut model, material, transform)) in &mut world.query::<(&mut Model, &M, &Transform)>() {
-        renderer.execute(&mut PrepareModelCommand::new(&mut model, material))?;
-        renderer.execute(&mut DrawModelCommand::new(&model, material, transform))?;
+    let mut found_active_camera = false;
+
+    for (_, (mut camera, transform)) in &mut camera_world.query::<(&mut Camera, &Transform)>() {
+        if camera.is_active() {
+            if found_active_camera {
+                Err(RenderError::MultipleActiveCameras)?;
+            } else {
+                found_active_camera = true;
+
+                renderer.execute(&mut RenderCameraCommand::<M>::new(&mut camera, transform))?;
+                for (_, (mut model, material, transform)) in &mut model_world.query::<(&mut Model, &M, &Transform)>() {
+                    renderer.execute(&mut PrepareModelCommand::new(&mut model, material))?;
+                    renderer.execute(&mut DrawModelCommand::new(&model, material, transform))?;
+                }
+            }
+        }
     }
 
     Ok(())

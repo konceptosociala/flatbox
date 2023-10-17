@@ -13,4 +13,6 @@ pub enum RenderError {
     MaterialNotBound(String),
     #[error("Model is not prepared for drawing. Before `DrawModelCommand` call `PrepareModelCommand` first")]
     ModelNotPrepared,
+    #[error("There can be only one active camera at once")]
+    MultipleActiveCameras,
 }

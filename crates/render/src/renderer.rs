@@ -1,10 +1,13 @@
 use std::collections::hash_map::{HashMap, Entry};
 use std::any::TypeId;
+use std::marker::PhantomData;
 
-use flatbox_core::math::transform::Transform;
 use flatbox_core::{
-    logger::error,
-    math::glm,
+    logger::{warn, error},
+    math::{
+        glm,
+        transform::Transform,
+    },
 };
 use pretty_type_name::pretty_type_name;
 
@@ -17,14 +20,32 @@ use crate::{
     pbr::{
         material::Material,
         model::Model,
+        camera::Camera,
     },
 };
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, PartialOrd)]
+pub struct WindowExtent {
+    pub width: f32,
+    pub height: f32,
+}
+
+impl WindowExtent {
+    pub fn new(width: f32, height: f32) -> WindowExtent {
+        WindowExtent { width, height }
+    }
+
+    pub fn to_aspect(&self) -> f32 {
+        self.width / self.height
+    }
+}
 
 pub type GraphicsPipelines = HashMap<TypeId, GraphicsPipeline>;
 
 pub struct Renderer {
     graphics_pipelines: GraphicsPipelines,
     clear_color: glm::Vec3,
+    extent: WindowExtent,
 }
 
 impl Renderer {
@@ -40,7 +61,16 @@ impl Renderer {
         Renderer {
             graphics_pipelines: GraphicsPipelines::new(),
             clear_color: glm::vec3(0.1, 0.1, 0.1),
+            extent: WindowExtent::new(800.0, 600.0),
         }
+    }
+
+    pub fn extent(&self) -> WindowExtent {
+        self.extent
+    }
+
+    pub fn set_extent(&mut self, extent: WindowExtent) {
+        self.extent = extent;
     }
 
     pub fn set_clear_color(&mut self, color: glm::Vec3) {
@@ -52,16 +82,16 @@ impl Renderer {
     }
 
     pub fn bind_material<M: Material>(&mut self) {
-        let vertex_shader = Shader::new_from_source(M::vertex_shader(), ShaderType::VertexShader)
-            .expect("Cannot compile vertex shader");
-
-        let fragment_shader = Shader::new_from_source(M::fragment_shader(), ShaderType::FragmentShader)
-            .expect("Cannot compile fragment shader");
-
         let material_type = TypeId::of::<M>();
-        let pipeline = GraphicsPipeline::new(&[vertex_shader, fragment_shader]).expect("Cannot initialize graphics pipeline");
-
+        
         if let Entry::Vacant(e) = self.graphics_pipelines.entry(material_type) {
+            let vertex_shader = Shader::new_from_source(M::vertex_shader(), ShaderType::VertexShader)
+                .expect("Cannot compile vertex shader");
+
+            let fragment_shader = Shader::new_from_source(M::fragment_shader(), ShaderType::FragmentShader)
+                .expect("Cannot compile fragment shader");
+
+            let pipeline = GraphicsPipeline::new(&[vertex_shader, fragment_shader]).expect("Cannot initialize graphics pipeline");
             e.insert(pipeline);
         } else {
             error!("Material type `{}` is already bound", pretty_type_name::<M>());
@@ -87,6 +117,34 @@ impl RenderCommand for ClearCommand {
             gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
         }
 
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
+pub struct RenderCameraCommand<'a, M: Material> {
+    camera: &'a mut Camera,
+    transform: &'a Transform,
+    __phantom_data: PhantomData<M>,
+}
+
+impl<'a, M: Material> RenderCameraCommand<'a, M> {
+    pub fn new(camera: &'a mut Camera, transform: &'a Transform) -> RenderCameraCommand<'a, M> {
+        Self { camera, transform, __phantom_data: PhantomData }
+    }
+}
+
+impl<'a, M: Material> RenderCommand for RenderCameraCommand<'a, M> {
+    fn execute(&mut self, renderer: &mut Renderer) -> Result<(), RenderError> {
+        let pipeline = renderer.get_pipeline::<M>()?;
+
+        if !self.camera.is_active() {
+            warn!("Camera being rendered is not active");
+        }
+
+        self.camera.set_aspect(renderer.extent().to_aspect());
+        self.camera.update_buffer(pipeline, self.transform);
+                
         Ok(())
     }
 }
@@ -149,14 +207,14 @@ impl<'a, M: Material> RenderCommand for DrawModelCommand<'a, M> {
         self.material.process_pipeline(pipeline);
         
         let model = self.transform.to_matrix();
-        let mut view = glm::Mat4::identity();
-        view = glm::translate(&view, &glm::vec3(0.0, 0.0, -3.0));
-        let projection = glm::perspective(45.0f32.to_radians(), 800.0 / 600.0, 0.1, 100.0);
+        // let mut view = glm::Mat4::identity();
+        // view = glm::translate(&view, &glm::vec3(0.0, 0.0, -3.0));
+        // let projection = glm::perspective(45.0f32.to_radians(), 800.0 / 600.0, 0.1, 100.0);
         
         pipeline.apply();
         pipeline.set_mat4("model", &model);
-        pipeline.set_mat4("view", &view);
-        pipeline.set_mat4("projection", &projection);
+        // pipeline.set_mat4("view", &view);
+        // pipeline.set_mat4("projection", &projection);
     
         mesh.vertex_array.bind();
 

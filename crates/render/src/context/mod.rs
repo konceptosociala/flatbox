@@ -1,17 +1,27 @@
-use std::time::{Instant, Duration};
-
 /*
  * Based on `game-loop` (c) tuzz
  * Licensed under MIT License
  */
+use std::time::{Instant, Duration};
 use flatbox_core::logger::LoggerLevel;
 use glutin::{
     platform::run_return::EventLoopExtRunReturn,
     event_loop::{EventLoop, ControlFlow}, 
     window::{Window, Icon, WindowBuilder as GlutinWindowBuilder},
-    dpi::{Size, LogicalSize},
+    dpi::{Size, LogicalSize, PhysicalSize},
     ContextWrapper, PossiblyCurrent, ContextBuilder, GlRequest, Api, event::{Event, WindowEvent},
 };
+
+use crate::renderer::WindowExtent;
+
+impl From<PhysicalSize<u32>> for WindowExtent {
+    fn from(size: PhysicalSize<u32>) -> Self {
+        WindowExtent { 
+            width: size.width as f32, 
+            height: size.height as f32,
+        }
+    }
+}
 
 #[derive(Default)]
 pub enum EventLoopWrapper {
@@ -40,6 +50,7 @@ impl EventLoopWrapper {
 }
 
 pub enum ContextEvent {
+    ResizeEvent(WindowExtent),
     UpdateEvent,
     RenderEvent,
 }
@@ -47,11 +58,9 @@ pub enum ContextEvent {
 pub struct Context {
     event_loop: EventLoopWrapper,
     ctx: ContextWrapper<PossiblyCurrent, Window>,
-    pub updates_per_second: u32,
-    pub max_frame_time: Duration,
-    pub exit_next_iteration: bool,
-    pub window_occluded: bool,
-
+    max_frame_time: Duration,
+    exit_next_iteration: bool,
+    window_occluded: bool,
     fixed_time_step: f64,
     number_of_updates: u32,
     number_of_renders: u32,
@@ -92,11 +101,9 @@ impl Context {
         Context {
             event_loop: EventLoopWrapper::new(event_loop),
             ctx: gl_context,
-            updates_per_second: builder.updates_per_second,
             max_frame_time: Duration::from_secs_f64(builder.max_frame_time),
             window_occluded: false,
             exit_next_iteration: false,
-
             fixed_time_step: 1.0 / builder.updates_per_second as f64,
             number_of_updates: 0,
             number_of_renders: 0,
@@ -152,7 +159,12 @@ impl Context {
                 Event::LoopDestroyed => (),
                 Event::WindowEvent { event, .. } => match event {
                     WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
-                    WindowEvent::Resized(physical_size) => self.ctx.resize(physical_size),
+                    WindowEvent::Resized(physical_size) => {
+                        let size = WindowExtent::from(physical_size);
+                        unsafe { gl::Viewport(0, 0, size.width as i32, size.height as i32); }
+                        (runner)(ContextEvent::ResizeEvent(size));
+                        self.ctx.resize(physical_size);
+                    },
                     WindowEvent::Occluded(occluded) => self.window_occluded = occluded,
                     _ => {},
                 },

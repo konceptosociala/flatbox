@@ -30,7 +30,5 @@ impl Material for DefaultMaterial {
         pipeline.set_vec3("color", &self.color);
     }
 
-    fn process_pipeline(&self, _pipeline: &GraphicsPipeline) {
-        
-    }
+    fn process_pipeline(&self, _: &GraphicsPipeline) {}
 }
