@@ -1,4 +1,5 @@
 use std::any::TypeId;
+// use extension::RenderGuiExtension;
 use pretty_type_name::pretty_type_name;
 use flatbox_assets::manager::AssetManager;
 use flatbox_core::logger::FlatboxLogger;
@@ -54,7 +55,7 @@ impl Flatbox {
         FlatboxLogger::init_with_level(window_builder.logger_level);
 
         let context = Context::new(&window_builder);
-        let renderer = Renderer::init(|addr| context.get_proc_address(addr));
+        let renderer = Renderer::init(&context).expect("Cannot initialize renderer");
 
         Flatbox {
             assets: AssetManager::new(),
@@ -124,6 +125,7 @@ impl Flatbox {
         self
             .add_extension(BaseRenderExtension)
             .add_extension(RenderMaterialExtension::<DefaultMaterial>::new())
+            // .add_extension(RenderGuiExtension)
     }
 
     pub fn run(&mut self){
@@ -143,7 +145,7 @@ impl Flatbox {
             &mut self.assets,
         )).expect("Cannot execute setup systems");
 
-        self.context.run(|event|{
+        self.context.run(|event, mut display|{
             match event {
                 ContextEvent::ResizeEvent(extent) => {
                     self.renderer.set_extent(extent);
@@ -155,8 +157,9 @@ impl Flatbox {
                         &mut self.assets,
                     )).expect("Cannot execute update systems");
                 },
-                ContextEvent::RenderEvent => {
+                ContextEvent::RenderEvent => {                  
                     render_schedule.execute_seq((
+                        &mut display,
                         &mut self.world,
                         &mut self.renderer,
                         &mut self.assets,

@@ -11,12 +11,10 @@ use flatbox_core::{
 };
 use pretty_type_name::pretty_type_name;
 
+use crate::context::Context;
 use crate::{
     error::RenderError,
-    hal::{
-        shader::{GraphicsPipeline, Shader, ShaderType},
-        GlInitFunction,
-    },
+    hal:: shader::{GraphicsPipeline, Shader, ShaderType},
     pbr::{
         material::Material,
         model::Model,
@@ -40,6 +38,12 @@ impl WindowExtent {
     }
 }
 
+impl From<WindowExtent> for [u32; 2] {
+    fn from(e: WindowExtent) -> Self {
+        [e.width as u32, e.height as u32]
+    }
+}
+
 pub type GraphicsPipelines = HashMap<TypeId, GraphicsPipeline>;
 
 pub struct Renderer {
@@ -48,7 +52,11 @@ pub struct Renderer {
     extent: WindowExtent,
 }
 
+#[cfg(not(feature = "context"))]
+use crate::hal::GlInitFunction;
+
 impl Renderer {
+    #[cfg(not(feature = "context"))]
     pub fn init<F: GlInitFunction>(init_function: F) -> Renderer {
         gl::load_with(init_function);
 
@@ -63,6 +71,17 @@ impl Renderer {
             clear_color: glm::vec3(0.1, 0.1, 0.1),
             extent: WindowExtent::new(800.0, 600.0),
         }
+    }
+
+    #[cfg(feature = "context")]
+    pub fn init(context: &Context) -> Result<Renderer, RenderError> {
+        gl::load_with(|addr| context.get_proc_address(addr));
+
+        Ok(Renderer {
+            graphics_pipelines: GraphicsPipelines::new(),
+            clear_color: glm::vec3(0.1, 0.1, 0.1),
+            extent: WindowExtent::new(800.0, 600.0),
+        })
     }
 
     pub fn extent(&self) -> WindowExtent {
@@ -113,6 +132,9 @@ pub struct ClearCommand;
 impl RenderCommand for ClearCommand {
     fn execute(&mut self, renderer: &mut Renderer) -> Result<(), RenderError> {
         unsafe {
+            gl::Enable(gl::BLEND);
+            gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
+            gl::Enable(gl::DEPTH_TEST);  
             gl::ClearColor(renderer.clear_color.x, renderer.clear_color.y, renderer.clear_color.z, 1.0);
             gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
         }
@@ -207,14 +229,9 @@ impl<'a, M: Material> RenderCommand for DrawModelCommand<'a, M> {
         self.material.process_pipeline(pipeline);
         
         let model = self.transform.to_matrix();
-        // let mut view = glm::Mat4::identity();
-        // view = glm::translate(&view, &glm::vec3(0.0, 0.0, -3.0));
-        // let projection = glm::perspective(45.0f32.to_radians(), 800.0 / 600.0, 0.1, 100.0);
         
         pipeline.apply();
         pipeline.set_mat4("model", &model);
-        // pipeline.set_mat4("view", &view);
-        // pipeline.set_mat4("projection", &projection);
     
         mesh.vertex_array.bind();
 

@@ -5,7 +5,7 @@ use flatbox_assets::AssetHandle;
 use crate::{
     macros::set_vertex_attribute,
     hal::{
-        buffer::{Buffer, VertexArray, BufferTarget, BufferUsage}, 
+        buffer::{Buffer, VertexArray, BufferTarget, BufferUsage, AttributeType}, 
         shader::GraphicsPipeline
     }, 
 };
@@ -138,9 +138,9 @@ impl Mesh {
         let texcoord_attribute = pipeline.get_attribute_location("texcoord");
 
         let vertex_array = &self.vertex_array;
-        set_vertex_attribute!(vertex_array, position_attribute, Vertex::position);
-        set_vertex_attribute!(vertex_array, normal_attribute, Vertex::normal);
-        set_vertex_attribute!(vertex_array, texcoord_attribute, Vertex::texcoord);
+        set_vertex_attribute!(vertex_array, position_attribute, Vertex::position, AttributeType::Float);
+        set_vertex_attribute!(vertex_array, normal_attribute, Vertex::normal, AttributeType::Float);
+        set_vertex_attribute!(vertex_array, texcoord_attribute, Vertex::texcoord, AttributeType::Float);
     }
 
     pub fn update_vertices(&self){     

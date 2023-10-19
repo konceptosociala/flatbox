@@ -46,6 +46,14 @@ impl Texture {
         unsafe { Texture::new_internal(path, filter as u32) }
     }
 
+    /// Create texture instance from raw OpenGL pointer
+    /// 
+    /// ## Safety
+    /// `id` must be a valid OpenGL pointer to texture
+    pub unsafe fn from_raw(id: u32) -> Texture {
+        Texture { id }
+    }
+
     pub fn activate(&self, order: Order) {
         unsafe { gl::ActiveTexture(order as u32); }
         self.bind();

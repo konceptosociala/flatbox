@@ -51,8 +51,12 @@ impl Buffer {
         }
     }
 
-    fn bind(&self){
+    pub fn bind(&self) {
         unsafe { gl::BindBuffer(self.target, self.id); }
+    }
+
+    pub fn unbind(&self) {
+        unsafe { gl::BindBuffer(self.target, 0); }
     }
 
     unsafe fn new_internal(target: BufferTarget, usage: BufferUsage) -> Buffer {
@@ -91,6 +95,20 @@ impl Drop for Buffer {
     }
 }
 
+glenum_wrapper! {
+    wrapper: AttributeType,
+    variants: [
+        Byte,
+        UnsignedByte,
+        Short,
+        UnsignedShort,
+        Int,
+        UnsignedInt,
+        Float,
+        Double
+    ]
+}
+
 #[readonly::make]
 pub struct VertexArray {
     id: GLuint,
@@ -105,6 +123,10 @@ impl VertexArray {
         unsafe { gl::BindVertexArray(self.id); }
     }
 
+    pub fn unbind(&self) {
+        unsafe { gl::BindVertexArray(0); }
+    }
+
     /// set attribute
     /// 
     /// ## Safety
@@ -112,6 +134,7 @@ impl VertexArray {
     pub unsafe fn set_attribute<V: Sized>(
         &self,
         attrib_pos: u32,
+        attrib_type: AttributeType,
         components: i32,
         offset: i32,
     ) {
@@ -119,7 +142,7 @@ impl VertexArray {
         gl::VertexAttribPointer(
             attrib_pos,
             components,
-            gl::FLOAT,
+            attrib_type as u32,
             gl::FALSE,
             std::mem::size_of::<V>() as GLint,
             offset as *const _,

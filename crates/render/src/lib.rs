@@ -2,6 +2,8 @@
 pub mod context;
 pub mod error;
 pub mod hal;
+#[cfg(feature = "context")]
+pub mod gui;
 pub mod macros;
 pub mod pbr;
 pub mod renderer;

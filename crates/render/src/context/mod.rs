@@ -2,17 +2,38 @@
  * Based on `game-loop` (c) tuzz
  * Licensed under MIT License
  */
-use std::time::{Instant, Duration};
+
+#![allow(clippy::arc_with_non_send_sync)]
+
+use std::{time::{Instant, Duration}, sync::Arc};
 use flatbox_core::logger::LoggerLevel;
 use glutin::{
     platform::run_return::EventLoopExtRunReturn,
-    event_loop::{EventLoop, ControlFlow}, 
+    event_loop::{EventLoop, ControlFlow, EventLoopWindowTarget}, 
     window::{Window, Icon, WindowBuilder as GlutinWindowBuilder},
     dpi::{Size, LogicalSize, PhysicalSize},
     ContextWrapper, PossiblyCurrent, ContextBuilder, GlRequest, Api, event::{Event, WindowEvent},
 };
+use parking_lot::{Mutex, MutexGuard};
+use crate::{renderer::WindowExtent, gui::backend::EguiBackend};
 
-use crate::renderer::WindowExtent;
+pub type GlContext = ContextWrapper<PossiblyCurrent, Window>;
+
+#[derive(Clone)]
+pub struct Display(Arc<Mutex<GlContext>>);
+
+impl Display {
+    pub fn new(context: GlContext) -> Display {
+        Display(Arc::new(Mutex::new(context)))
+    }
+
+    pub fn lock(&self) -> MutexGuard<ContextWrapper<PossiblyCurrent, Window>> {
+        self.0.lock()
+    }
+}
+
+unsafe impl Send for Display {}
+unsafe impl Sync for Display {}
 
 impl From<PhysicalSize<u32>> for WindowExtent {
     fn from(size: PhysicalSize<u32>) -> Self {
@@ -49,6 +70,15 @@ impl EventLoopWrapper {
     }
 }
 
+impl AsRef<EventLoop<()>> for EventLoopWrapper {
+    fn as_ref(&self) -> &EventLoop<()> {
+        match self {
+            Self::NotPresent => panic!("EventLoop is not present"),
+            Self::Present(e) => e,
+        }
+    }
+}
+
 pub enum ContextEvent {
     ResizeEvent(WindowExtent),
     UpdateEvent,
@@ -57,7 +87,7 @@ pub enum ContextEvent {
 
 pub struct Context {
     event_loop: EventLoopWrapper,
-    ctx: ContextWrapper<PossiblyCurrent, Window>,
+    display: Display,
     max_frame_time: Duration,
     exit_next_iteration: bool,
     window_occluded: bool,
@@ -100,7 +130,7 @@ impl Context {
 
         Context {
             event_loop: EventLoopWrapper::new(event_loop),
-            ctx: gl_context,
+            display: Display::new(gl_context),
             max_frame_time: Duration::from_secs_f64(builder.max_frame_time),
             window_occluded: false,
             exit_next_iteration: false,
@@ -116,11 +146,19 @@ impl Context {
         }
     }
 
-    pub fn get_proc_address(&self, addr: &str) -> *const core::ffi::c_void {
-        self.ctx.get_proc_address(addr)
+    pub fn display(&self) -> &Display {
+        &self.display
     }
 
-    pub fn next_frame<F: FnMut(ContextEvent)>(&mut self, mut runner: F) -> bool {
+    pub fn event_loop_target(&self) -> &EventLoopWindowTarget<()> {
+        self.event_loop.as_ref()
+    }
+
+    pub fn get_proc_address(&self, addr: &str) -> *const core::ffi::c_void {
+        self.display.lock().get_proc_address(addr)
+    }
+
+    pub fn next_frame<F: FnMut(ContextEvent, Display)>(&mut self, mut runner: F) -> bool {
         if self.exit_next_iteration { return false; }
 
         self.current_instant = Instant::now();
@@ -133,7 +171,7 @@ impl Context {
         self.accumulated_time += elapsed.as_secs_f64();
 
         while self.accumulated_time >= self.fixed_time_step {
-            (runner)(ContextEvent::UpdateEvent);
+            (runner)(ContextEvent::UpdateEvent, self.display.clone());
 
             self.accumulated_time -= self.fixed_time_step;
             self.number_of_updates += 1;
@@ -144,7 +182,7 @@ impl Context {
         if self.window_occluded {
             std::thread::sleep(Duration::from_secs_f64(self.fixed_time_step));
         } else {
-            (runner)(ContextEvent::RenderEvent);
+            (runner)(ContextEvent::RenderEvent, self.display.clone());
             self.number_of_renders += 1;
         }
 
@@ -153,30 +191,61 @@ impl Context {
         true
     }
 
-    pub fn run<F: FnMut(ContextEvent)>(&mut self, mut runner: F) {
+    pub fn run<F: FnMut(ContextEvent, Display)>(&mut self, mut runner: F) {
+        let mut egui_backend = EguiBackend::new(&self.display.lock(), self.event_loop.as_ref());
+
         self.event_loop.take().run_return(move |event, _, control_flow|{  
             match event {
                 Event::LoopDestroyed => (),
-                Event::WindowEvent { event, .. } => match event {
-                    WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
-                    WindowEvent::Resized(physical_size) => {
-                        let size = WindowExtent::from(physical_size);
-                        unsafe { gl::Viewport(0, 0, size.width as i32, size.height as i32); }
-                        (runner)(ContextEvent::ResizeEvent(size));
-                        self.ctx.resize(physical_size);
-                    },
-                    WindowEvent::Occluded(occluded) => self.window_occluded = occluded,
-                    _ => {},
-                },
-                Event::RedrawRequested(_) => {
-                    if !self.next_frame(&mut runner) {
-                        *control_flow = ControlFlow::Exit;
+                Event::WindowEvent { event, .. } => {
+                    match event {
+                        WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
+                        WindowEvent::Resized(physical_size) => {
+                            let size = WindowExtent::from(physical_size);
+                            unsafe { gl::Viewport(0, 0, size.width as i32, size.height as i32); }
+                            (runner)(ContextEvent::ResizeEvent(size), self.display.clone());
+                            self.display.lock().resize(physical_size);
+                        },
+                        WindowEvent::Occluded(occluded) => self.window_occluded = occluded,
+                        _ => {},
                     }
 
-                    self.ctx.swap_buffers().unwrap();
+                    if egui_backend.on_event(&event) {
+                        self.display.lock().window().request_redraw();
+                    }
+                },
+                Event::RedrawRequested(_) => {
+                    self.next_frame(&mut runner);
+
+                    let mut quit = false;
+        
+                    let repaint_after = egui_backend.run(&self.display.lock(), |egui_ctx| {
+                        egui::SidePanel::left("my_side_panel").show(egui_ctx, |ui| {
+                            ui.heading("Hello World!");
+                            if ui.button("Quit").clicked() {
+                                quit = true;
+                            }
+                        });
+                    });
+        
+                    *control_flow = if quit {
+                        glutin::event_loop::ControlFlow::Exit
+                    } else if repaint_after.is_zero() {
+                        self.display.lock().window().request_redraw();
+                        glutin::event_loop::ControlFlow::Poll
+                    // } else if let Some(repaint_after_instant) = Instant::now().checked_add(repaint_after) {
+                    //     glutin::event_loop::ControlFlow::WaitUntil(repaint_after_instant)
+                    } else {
+                        *control_flow
+                    };
+        
+                    egui_backend.paint(&self.display.lock());
+    
+    
+                    self.display.lock().swap_buffers().unwrap();
                 },
                 Event::MainEventsCleared => {
-                    self.ctx.window().request_redraw();
+                    self.display.lock().window().request_redraw();
                 },
                 _ => {},
             }

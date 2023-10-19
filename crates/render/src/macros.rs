@@ -32,20 +32,38 @@ macro_rules! c_string {
 
 #[macro_export]
 macro_rules! set_vertex_attribute {
-    ($vao:ident, $pos:tt, $t:ident :: $field:tt) => {
+    ($vao:ident, $pos:tt, $t:ident :: $field:tt, $attrib_type:expr) => {
         {
+            use core::mem::size_of;
+            use $crate::hal::buffer::AttributeType::*;
+
+            const fn size_of_raw<T>(_: *const T) -> usize {
+                size_of::<T>()
+            }
+
             let dummy = core::mem::MaybeUninit::<$t>::uninit();
             let dummy_ptr = dummy.as_ptr();
             let member_ptr = unsafe { core::ptr::addr_of!((*dummy_ptr).$field) };
-            const fn size_of_raw<T>(_: *const T) -> usize {
-                core::mem::size_of::<T>()
-            }
             let member_offset = member_ptr as i32 - dummy_ptr as i32;
+
+            let size = match $attrib_type {
+                Byte            => size_of::<i8>(),
+                UnsignedByte    => size_of::<u8>(),
+                Short           => size_of::<i16>(),
+                UnsignedShort   => size_of::<u16>(),
+                Int             => size_of::<i32>(),
+                UnsignedInt     => size_of::<u32>(),
+                Float           => size_of::<f32>(),
+                Double          => size_of::<f64>(),
+            };
+
+            println!("{}: {}", stringify!($pos), (size_of_raw(member_ptr) / size) as i32);
 
             unsafe { 
                 $vao.set_attribute::<$t>(
                     $pos,
-                    (size_of_raw(member_ptr) / core::mem::size_of::<f32>()) as i32,
+                    $attrib_type,
+                    (size_of_raw(member_ptr) / size) as i32,
                     member_offset,
                 )
             }

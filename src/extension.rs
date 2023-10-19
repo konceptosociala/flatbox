@@ -50,3 +50,13 @@ impl<M: Material> Default for RenderMaterialExtension<M> {
         RenderMaterialExtension(PhantomData)
     }
 }
+
+// #[derive(Debug)]
+// pub struct RenderGuiExtension;
+
+// impl Extension for RenderGuiExtension {
+//     fn apply(&self, app: &mut Flatbox) {
+//         app
+//             .add_render_system(render_egui);
+//     }
+// }
