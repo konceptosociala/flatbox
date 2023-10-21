@@ -4,17 +4,37 @@ use flatbox_assets::{
     manager::Asset,
     typetag,
 };
-use gl::types::{GLuint, GLenum};
+use gl::types::GLuint;
 use image::EncodableLayout;
 use serde::{Serialize, Deserialize};
 
-use crate::{macros::glenum_wrapper, error::RenderError};
+use crate::{
+    macros::glenum_wrapper, 
+    error::RenderError
+};
 
 glenum_wrapper! {
     wrapper: Filter,
     variants: [
         Linear,
         Nearest
+    ]
+}
+
+glenum_wrapper! {
+    wrapper: WrapMode,
+    variants: [
+        Repeat,
+        ClampToEdge,
+        MirroredRepeat
+    ]
+}
+
+glenum_wrapper! {
+    wrapper: ColorMode,
+    variants: [
+        Srgb8Alpha8,
+        Rgba
     ]
 }
 
@@ -32,9 +52,32 @@ glenum_wrapper! {
     ]
 }
 
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+pub enum ImageType {
+    Image2D,
+    SubImage2D([usize; 2]),
+}
+
+pub struct TextureDescriptor {
+    pub filter: Filter,
+    pub wrap_mode: WrapMode,
+    pub color_mode: ColorMode,
+    pub image_type: ImageType,
+}
+
+impl Default for TextureDescriptor {
+    fn default() -> Self {
+        TextureDescriptor {
+            filter: Filter::Linear,
+            wrap_mode: WrapMode::Repeat,
+            color_mode: ColorMode::Rgba,
+            image_type: ImageType::Image2D,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct Texture {
-    // TODO: add texture type and raw image data
     id: GLuint,
 }
 
@@ -42,16 +85,22 @@ pub struct Texture {
 impl Asset for Texture {}
 
 impl Texture {
-    pub fn new<P: AsRef<Path>>(path: P, filter: Filter) -> Result<Texture, RenderError> {
-        unsafe { Texture::new_internal(path, filter as u32) }
+    pub fn new<P: AsRef<Path>>(path: P, descr: Option<TextureDescriptor>) -> Result<Texture, RenderError> {
+        let img = image::open(path)?.into_rgba8();
+        Texture::new_from_raw(img.as_bytes(), img.width(), img.height(), descr)
     }
 
-    /// Create texture instance from raw OpenGL pointer
-    /// 
-    /// ## Safety
-    /// `id` must be a valid OpenGL pointer to texture
-    pub unsafe fn from_raw(id: u32) -> Texture {
+    pub fn from_raw(id: GLuint) -> Texture {
         Texture { id }
+    }
+
+    pub fn new_from_raw(
+        buf: &[u8], 
+        width: u32, 
+        height: u32, 
+        descr: Option<TextureDescriptor>,
+    ) -> Result<Texture, RenderError> {
+        unsafe { Texture::new_internal(buf, width, height, descr) }
     }
 
     pub fn activate(&self, order: Order) {
@@ -63,29 +112,50 @@ impl Texture {
         unsafe { gl::BindTexture(gl::TEXTURE_2D, self.id); }
     }
 
-    unsafe fn new_internal<P: AsRef<Path>>(path: P, filter: GLenum) -> Result<Texture, RenderError> {
+    unsafe fn new_internal(
+        buf: &[u8], 
+        width: u32, 
+        height: u32, 
+        descr: Option<TextureDescriptor>,
+    ) -> Result<Texture, RenderError> {
         let mut id: GLuint = 0;
         gl::GenTextures(1, &mut id);
 
         let texture = Texture { id };
         texture.bind();
 
-        let img = image::open(path)?.into_rgba8();
-        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, filter as i32);
-        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, filter as i32);
-        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, gl::REPEAT as i32);
-        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, gl::REPEAT as i32);
-        gl::TexImage2D(
-            gl::TEXTURE_2D,
-            0,
-            gl::RGBA as i32,
-            img.width() as i32,
-            img.height() as i32,
-            0,
-            gl::RGBA,
-            gl::UNSIGNED_BYTE,
-            img.as_bytes().as_ptr() as *const _,
-        );
+        let descr = descr.unwrap_or_default();
+
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, descr.filter as i32);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, descr.filter as i32);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, descr.wrap_mode as i32);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, descr.wrap_mode as i32);
+        gl::PixelStorei(gl::UNPACK_ALIGNMENT, 1);
+
+        match descr.image_type {
+            ImageType::Image2D => gl::TexImage2D(
+                gl::TEXTURE_2D,
+                0,
+                descr.color_mode as i32,
+                width as i32,
+                height as i32,
+                0,
+                gl::RGBA,
+                gl::UNSIGNED_BYTE,
+                buf.as_ptr() as *const _,
+            ),
+            ImageType::SubImage2D([x, y]) => gl::TexSubImage2D(
+                gl::TEXTURE_2D,
+                0,
+                x as _,
+                y as _,
+                width as _,
+                height as _,
+                gl::RGBA,
+                gl::UNSIGNED_BYTE,
+                buf.as_ptr() as *const _,
+            )
+        };
 
         Ok(texture)
     }

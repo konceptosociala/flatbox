@@ -2,6 +2,10 @@ use std::marker::PhantomData;
 use std::any::TypeId;
 use std::fmt::Debug;
 use flatbox_render::pbr::material::Material;
+use flatbox_egui::{
+    command::render_egui, 
+    backend::EguiBackend
+};
 use flatbox_systems::rendering::{render_material, clear_screen, bind_material};
 use indexmap::IndexMap;
 
@@ -51,12 +55,16 @@ impl<M: Material> Default for RenderMaterialExtension<M> {
     }
 }
 
-// #[derive(Debug)]
-// pub struct RenderGuiExtension;
+#[derive(Debug)]
+pub struct RenderGuiExtension;
 
-// impl Extension for RenderGuiExtension {
-//     fn apply(&self, app: &mut Flatbox) {
-//         app
-//             .add_render_system(render_egui);
-//     }
-// }
+impl Extension for RenderGuiExtension {
+    fn apply(&self, app: &mut Flatbox) {
+        app
+            .add_resource(EguiBackend::new(&app.context))
+            .add_render_system(render_egui)
+            .set_on_window_event(|resources, event| {
+                resources.get_resource_mut::<EguiBackend>().unwrap().on_event(&event)
+            });
+    }
+}

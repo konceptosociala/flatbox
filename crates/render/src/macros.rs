@@ -57,8 +57,6 @@ macro_rules! set_vertex_attribute {
                 Double          => size_of::<f64>(),
             };
 
-            println!("{}: {}", stringify!($pos), (size_of_raw(member_ptr) / size) as i32);
-
             unsafe { 
                 $vao.set_attribute::<$t>(
                     $pos,

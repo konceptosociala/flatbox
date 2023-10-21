@@ -1,70 +1,108 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, hash_map::Entry};
 use std::any::TypeId;
-use as_any::{AsAny, Downcast};
-use flatbox_core::catch::CatchError;
-use flume::{Sender, Receiver};
-use hecs::Component;
+use std::sync::Arc;
 
-pub trait Event: Component + Clone {}
-impl<E: Component + Clone> Event for E {}
+use flatbox_core::logger::error;
+use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard, MappedRwLockReadGuard, MappedRwLockWriteGuard};
+use as_any::AsAny;
+use pretty_type_name::pretty_type_name;
+
+/// App exit event. When it's sent, application makes close request
+#[derive(Clone)]
+pub struct AppExit;
+
+/// Generic event trait. Every clonable `Send` + `Sync` type can be `Event`
+pub trait Event: Clone + Send + Sync + 'static {}
+impl<E: Clone + Send + Sync + 'static> Event for E {}
+
+/// Routine, which reads and writes events of a concrete type
+pub struct EventHandler<E: Event> {
+    events: Option<E>,
+}
+
+impl<E: Event> EventHandler<E> {
+    /// Instantiate new empty [`EventHandler`]
+    pub fn new() -> Self {
+        EventHandler::<E>::default()
+    }
+    
+    /// Send event to the handler
+    pub fn send(&mut self, event: E){        
+        self.events = Some(event);
+    }
+    
+    /// Listen for events
+    pub fn read(&self) -> Option<E> {
+        self.events.clone()
+    }
+    
+    /// Clear events. It is called by the engine at every schedule run
+    pub fn clear(&mut self){
+        self.events = None;
+    }
+}
+
+impl<E: Event> Default for EventHandler<E> {
+    fn default() -> Self {
+        EventHandler { events: None }
+    }
+}
+
+pub trait GenericEventHandler: AsAny + Send + Sync + 'static {}
+impl<E: Event> GenericEventHandler for EventHandler<E> {} 
 
 #[derive(Default)]
-pub struct EventHandler {
-    writers: HashMap<TypeId, Box<dyn GenericWriter>>,
+pub struct Events {
+    storage: HashMap<TypeId, Arc<RwLock<dyn GenericEventHandler>>>,
 }
 
-impl EventHandler {
-    pub fn new() -> EventHandler {
-        EventHandler::default()
+impl Events {
+    pub fn new() -> Self {
+        Events::default()
     }
 
-    pub fn send<E: Event>(&self, event: E) {
-        if let Some(writer_boxed) = self.writers.get(&TypeId::of::<E>()) {
-            if let Some(writer) = writer_boxed.downcast_ref::<EventWriter<E>>() {
-                writer.send(event);
-            }
+    pub fn get_handler<E: Event>(&self) -> Option<MappedRwLockReadGuard<EventHandler<E>>> { 
+        if let Some(handler) = self.storage.get(&TypeId::of::<EventHandler<E>>()){
+            let data = match handler.try_read() {
+                Some(data) => data,
+                None => return None,
+            };
+
+            return RwLockReadGuard::try_map(data, |data| {
+                data.as_any().downcast_ref::<EventHandler<E>>()
+            }).ok() 
         }
+
+        None
     }
 
-    pub fn push_writer<E: Event>(&mut self) -> EventReader<E> {
-        let (tx, rx) = flume::unbounded();
-        self.writers.insert(TypeId::of::<E>(), Box::new(EventWriter::new(tx)));
-        EventReader::new(rx)
-    }
-}
+    pub fn get_handler_mut<E: Event>(&self) -> Option<MappedRwLockWriteGuard<EventHandler<E>>> { 
+        if let Some(handler) = self.storage.get(&TypeId::of::<EventHandler<E>>()){
+            let data = match handler.try_write() {
+                Some(data) => data,
+                None => return None,
+            };
 
-pub trait GenericWriter: AsAny + Send + Sync + 'static {}
+            return RwLockWriteGuard::try_map(data, |data| {
+                data.as_any_mut().downcast_mut::<EventHandler<E>>()
+            }).ok() 
+        }
 
-pub struct EventWriter<E: Event> {
-    sender: Sender<E>,
-}
-
-impl<E: Event> EventWriter<E> {
-    pub fn new(sender: Sender<E>) -> EventWriter<E> {
-        EventWriter { sender }
+        None
     }
 
-    pub fn send(&self, event: E) {
-        self.sender.send(event).catch();
+    pub fn get_handler_lock<E: Event>(&self) -> Option<&Arc<RwLock<dyn GenericEventHandler>>> {
+        self.storage.get(&TypeId::of::<EventHandler<E>>())
     }
 
-    pub fn is_dropped(&self) -> bool {
-        self.sender.is_disconnected()
-    }
-}
-
-impl<E: Event> GenericWriter for EventWriter<E> {}
-
-pub struct EventReader<E: Event> {
-    receiver: Receiver<E>,
-}
-
-impl<E: Event> EventReader<E> {
-    pub fn new(receiver: Receiver<E>) -> EventReader<E> {
-        EventReader { receiver }
-    }
-
-    pub fn read(&self) -> Option<E> {
-        self.receiver.try_recv().ok()
+    pub fn push_handler<H: GenericEventHandler>(
+        &mut self,
+        handler: H,
+    ){
+        if let Entry::Vacant(e) = self.storage.entry(TypeId::of::<H>()) {
+            e.insert(Arc::new(RwLock::new(handler)));
+        } else {
+            error!("Event handler '{}' is already pushed!", pretty_type_name::<H>());
+        }
     }
 }

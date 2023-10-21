@@ -7,7 +7,7 @@ pub trait CatchError {
 impl<E: Error> CatchError for Result<(), E> {
     fn catch(&self) {
         if let Err(e) = self {
-            log::error!("{e}");
+            ::log::error!("{e}");
         }
     }
 }

@@ -1,47 +1,37 @@
 use std::collections::HashMap;
-
 use egui::{
     emath::Rect,
     epaint::{Mesh, PaintCallbackInfo, Primitive, Vertex}, 
     TextureFilter, TextureId,
 };
-
 use flatbox_core::{
     logger::warn,
     math::glm,
 };
-
-use crate::{
+use flatbox_render::{
     macros::set_vertex_attribute,
     hal::{
         shader::{GraphicsPipeline, Shader, ShaderType}, 
         buffer::{Buffer, BufferTarget, BufferUsage, VertexArray, AttributeType}
     }, 
     error::RenderError, 
-    pbr::texture::{Filter, Texture}
+    pbr::texture::{Filter, Texture, TextureDescriptor, WrapMode, ColorMode, ImageType}
 };
 
-const VERT_SRC: &str = include_str!("../shaders/egui.vs");
-const FRAG_SRC: &str = include_str!("../shaders/egui.fs");
+const VERT_SRC: &str = include_str!("../../render/src/shaders/egui.vs");
+const FRAG_SRC: &str = include_str!("../../render/src/shaders/egui.fs");
 
-impl From<TextureFilter> for Filter {
-    fn from(f: TextureFilter) -> Self {
-        match f {
+pub trait ToNativeFilter {
+    fn to_native(&self) -> Filter;
+}
+
+impl ToNativeFilter for TextureFilter {
+    fn to_native(&self) -> Filter {
+        match self {
             TextureFilter::Linear => Filter::Linear,
             TextureFilter::Nearest => Filter::Nearest,
         }
     }
-}
-
-pub struct Painter {
-    max_texture_side: usize,
-    pipeline: GraphicsPipeline,
-    vertex_array: VertexArray,
-    vertex_buffer: Buffer,
-    index_buffer: Buffer,
-    textures: HashMap<TextureId, Texture>,
-    next_native_tex_id: u64,
-    textures_to_destroy: Vec<Texture>,
 }
 
 pub struct CallbackFn {
@@ -56,10 +46,19 @@ impl CallbackFn {
     }
 }
 
-impl Painter {
-    pub fn new() -> Result<Painter, RenderError> {
-        let max_texture_side = 4096;
+pub struct Painter {
+    max_texture_side: usize,
+    pipeline: GraphicsPipeline,
+    vertex_array: VertexArray,
+    vertex_buffer: Buffer,
+    index_buffer: Buffer,
+    textures: HashMap<TextureId, Texture>,
+    next_native_tex_id: u64,
+    textures_to_destroy: Vec<Texture>,
+}
 
+impl Painter { // FIXME: Painting only with Renderer in scope
+    pub fn new() -> Result<Painter, RenderError> {
         let vertex_shader = Shader::new_from_source(VERT_SRC, ShaderType::VertexShader)?;
         let fragment_shader = Shader::new_from_source(FRAG_SRC, ShaderType::FragmentShader)?;
         let pipeline = GraphicsPipeline::new(&[vertex_shader, fragment_shader])?;
@@ -79,12 +78,12 @@ impl Painter {
         set_vertex_attribute!(vertex_array, a_srgba_loc, Vertex::color, AttributeType::UnsignedByte);
 
         Ok(Painter {
-            max_texture_side,
+            max_texture_side: 4096,
             pipeline,
             vertex_array,
             vertex_buffer,
             index_buffer,
-            textures: Default::default(),
+            textures: HashMap::new(),
             next_native_tex_id: 1 << 32,
             textures_to_destroy: Vec::new(),
         })
@@ -128,23 +127,24 @@ impl Painter {
         (width_in_pixels, height_in_pixels)
     }
 
-    /// You are expected to have cleared the color buffer before calling this.
     pub fn paint_and_update_textures(
         &mut self,
         screen_size_px: [u32; 2],
         pixels_per_point: f32,
         clipped_primitives: &[egui::ClippedPrimitive],
         textures_delta: &egui::TexturesDelta,
-    ) {
+    ) -> Result<(), RenderError> {
         for (id, image_delta) in &textures_delta.set {
-            self.set_texture(*id, image_delta);
+            self.set_texture(*id, image_delta)?;
         }
 
         self.paint_primitives(screen_size_px, pixels_per_point, clipped_primitives);
 
         for &id in &textures_delta.free {
-            self.free_texture(id);
+            self.textures.remove(&id);
         }
+
+        Ok(())
     }
 
     pub fn paint_primitives(
@@ -236,33 +236,49 @@ impl Painter {
         }
     }
 
-    pub fn set_texture(&mut self, tex_id: egui::TextureId, delta: &egui::epaint::ImageDelta) {
-        let texture = self.textures.entry(tex_id).or_insert_with(|| unsafe {
-            let mut handle = 0;
-            gl::GenTextures(1, &mut handle);
-            Texture::from_raw(handle)
-        });
-        
-        texture.bind();
-
-        match &delta.image {
+    pub fn set_texture(
+        &mut self, 
+        tex_id: egui::TextureId, 
+        delta: &egui::epaint::ImageDelta
+    ) -> Result<(), RenderError> {
+        let texture = match &delta.image {
             egui::ImageData::Color(image) => {
-                assert_eq!(
-                    image.width() * image.height(),
-                    image.pixels.len(),
-                    "Mismatch between texture size and texel count"
-                );
+                let (w, h) = (image.width(), image.height());
 
                 let data: &[u8] = bytemuck::cast_slice(image.pixels.as_ref());
 
-                self.upload_texture_srgb(delta.pos, image.size, delta.filter, data);
-            }
-            egui::ImageData::Font(image) => {
                 assert_eq!(
-                    image.width() * image.height(),
+                    w * h,
                     image.pixels.len(),
                     "Mismatch between texture size and texel count"
                 );
+                assert_eq!(data.len(), w * h * 4);
+                assert!(
+                    w <= self.max_texture_side && h <= self.max_texture_side,
+                    "Got a texture image of size {}x{}, but the maximum supported texture side is only {}",
+                    w,
+                    h,
+                    self.max_texture_side
+                );
+
+                Texture::new_from_raw(
+                    data, 
+                    image.width() as u32, 
+                    image.height() as u32, 
+                    Some(TextureDescriptor {
+                        filter: delta.filter.to_native(),
+                        wrap_mode: WrapMode::ClampToEdge,
+                        color_mode: ColorMode::Srgb8Alpha8,
+                        image_type: match delta.pos {
+                            Some([x, y]) => ImageType::SubImage2D([x, y]),
+                            None => ImageType::Image2D,
+                        },
+                    })
+                )?
+
+            }
+            egui::ImageData::Font(image) => {
+                let (w, h) = (image.width(), image.height());
 
                 let gamma = 1.0;
                 let data: Vec<u8> = image
@@ -270,80 +286,40 @@ impl Painter {
                     .flat_map(|a| a.to_array())
                     .collect();
 
-                self.upload_texture_srgb(delta.pos, image.size, delta.filter, &data);
+                assert_eq!(
+                    w * h,
+                    image.pixels.len(),
+                    "Mismatch between texture size and texel count"
+                );
+                assert_eq!(data.len(), w * h * 4);
+                assert!(
+                    w <= self.max_texture_side && h <= self.max_texture_side,
+                    "Got a texture image of size {}x{}, but the maximum supported texture side is only {}",
+                    w,
+                    h,
+                    self.max_texture_side
+                );
+
+                Texture::new_from_raw(
+                    &data, 
+                    image.width() as u32, 
+                    image.height() as u32, 
+                    Some(TextureDescriptor {
+                        filter: delta.filter.to_native(),
+                        wrap_mode: WrapMode::ClampToEdge,
+                        color_mode: ColorMode::Srgb8Alpha8,
+                        image_type: match delta.pos {
+                            Some(coords) => ImageType::SubImage2D(coords),
+                            None => ImageType::Image2D,
+                        },
+                    })
+                )?
             }
         };
-    }
 
-    fn upload_texture_srgb(
-        &mut self,
-        pos: Option<[usize; 2]>,
-        [w, h]: [usize; 2],
-        texture_filter: TextureFilter,
-        data: &[u8],
-    ) {
-        assert_eq!(data.len(), w * h * 4);
-        assert!(
-            w <= self.max_texture_side && h <= self.max_texture_side,
-            "Got a texture image of size {}x{}, but the maximum supported texture side is only {}",
-            w,
-            h,
-            self.max_texture_side
-        );
+        self.textures.insert(tex_id, texture);
 
-        unsafe {
-            gl::TexParameteri(
-                gl::TEXTURE_2D,
-                gl::TEXTURE_MAG_FILTER,
-                Filter::from(texture_filter) as i32,
-            );
-            gl::TexParameteri(
-                gl::TEXTURE_2D,
-                gl::TEXTURE_MIN_FILTER,
-                Filter::from(texture_filter) as i32,
-            );
-
-            gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, gl::CLAMP_TO_EDGE as i32);
-            gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, gl::CLAMP_TO_EDGE as i32);
-
-            let (internal_format, src_format) = (gl::SRGB8_ALPHA8, gl::RGBA);
-
-            gl::PixelStorei(gl::UNPACK_ALIGNMENT, 1);
-
-            let level = 0;
-            if let Some([x, y]) = pos {
-                gl::TexSubImage2D(
-                    gl::TEXTURE_2D,
-                    level,
-                    x as _,
-                    y as _,
-                    w as _,
-                    h as _,
-                    src_format,
-                    gl::UNSIGNED_BYTE,
-                    data.as_ptr().cast(),
-                );
-            } else {
-                let border = 0;
-                gl::TexImage2D(
-                    gl::TEXTURE_2D,
-                    level,
-                    internal_format as _,
-                    w as _,
-                    h as _,
-                    border,
-                    src_format,
-                    gl::UNSIGNED_BYTE,
-                    data.as_ptr().cast(),
-                );
-            }
-        }
-    }
-
-    pub fn free_texture(&mut self, tex_id: TextureId) {
-        if let Some(old_tex) = self.textures.remove(&tex_id) {
-            drop(old_tex);
-        }
+        Ok(())
     }
 
     pub fn texture(&self, texture_id: TextureId) -> Option<&Texture> {

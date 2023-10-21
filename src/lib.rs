@@ -1,12 +1,12 @@
 use std::any::TypeId;
-// use extension::RenderGuiExtension;
+use extension::RenderGuiExtension;
 use pretty_type_name::pretty_type_name;
-use flatbox_assets::manager::AssetManager;
+use flatbox_assets::{manager::AssetManager, resources::{Resources, Resource}};
 use flatbox_core::logger::FlatboxLogger;
-use flatbox_ecs::{World, Schedules, Schedule, System};
+use flatbox_ecs::{World, Schedules, Schedule, System, event::{EventHandler, Events, Event}};
 use flatbox_render::{
     renderer::Renderer,
-    context::{Context, WindowBuilder, ContextEvent}, 
+    context::{Context, WindowBuilder, ContextEvent, WindowEvent}, 
     pbr::material::DefaultMaterial,
 };
 
@@ -41,13 +41,16 @@ pub mod systems {
 }
 
 pub struct Flatbox {
+    pub resources: Resources,
     pub assets: AssetManager,
     pub world: World,
     pub schedules: Schedules,
+    pub events: Events,
     pub extensions: Extensions,
     pub context: Context,
     pub renderer: Renderer,
     pub window_builder: WindowBuilder,
+    pub on_window_event: OnEventFn,
 }
 
 impl Flatbox {
@@ -58,6 +61,7 @@ impl Flatbox {
         let renderer = Renderer::init(&context).expect("Cannot initialize renderer");
 
         Flatbox {
+            resources: Resources::new(),
             assets: AssetManager::new(),
             world: World::new(),
             schedules: Schedules::from([
@@ -65,10 +69,12 @@ impl Flatbox {
                 ("update", Schedule::builder()),
                 ("render", Schedule::builder()),
             ]),
+            events: Events::new(),
             extensions: Extensions::new(),
             context,
             renderer,
             window_builder,
+            on_window_event: Box::new(on_event_empty),
         }
     }
 
@@ -113,6 +119,21 @@ impl Flatbox {
         self
     }
 
+    pub fn add_resource<R: Resource>(&mut self, resource: R) -> &mut Self {
+        self.resources.add_resource(resource);
+        self
+    }
+
+    pub fn add_event_handler<E: Event>(&mut self) -> &mut Self {
+        self.events.push_handler(EventHandler::<E>::new());
+        self
+    }
+
+    pub fn set_on_window_event<F: Fn(&mut Resources, WindowEvent) -> bool + 'static>(&mut self, on_event: F) -> &mut Self {
+        self.on_window_event = Box::new(on_event);
+        self
+    }
+
     pub fn add_extension<E: Extension + 'static>(&mut self, extension: E) -> &mut Self {
         if self.extensions.insert(TypeId::of::<E>(), Box::new(extension)).is_some() {
             panic!("Extension `{}` is already added!", pretty_type_name::<E>());
@@ -125,7 +146,7 @@ impl Flatbox {
         self
             .add_extension(BaseRenderExtension)
             .add_extension(RenderMaterialExtension::<DefaultMaterial>::new())
-            // .add_extension(RenderGuiExtension)
+            .add_extension(RenderGuiExtension)
     }
 
     pub fn run(&mut self){
@@ -135,37 +156,55 @@ impl Flatbox {
             ext.apply(self);
         }
 
+        let on_window_event = std::mem::replace(&mut self.on_window_event, Box::new(on_event_empty));
+
         let mut render_schedule = self.schedules.get_mut("render").unwrap().build();
         let mut setup_schedule = self.schedules.get_mut("setup").unwrap().build();
         let mut update_schedule = self.schedules.get_mut("update").unwrap().build();
 
         setup_schedule.execute_seq((
+            &mut self.events,
+            &mut self.resources,
             &mut self.world,
             &mut self.renderer,
             &mut self.assets,
         )).expect("Cannot execute setup systems");
 
-        self.context.run(|event, mut display|{
+        self.context.run(|event|{
             match event {
                 ContextEvent::ResizeEvent(extent) => {
                     self.renderer.set_extent(extent);
                 },
                 ContextEvent::UpdateEvent => {
                     update_schedule.execute((
+                        &mut self.events,
+                        &mut self.resources,
                         &mut self.world,
                         &mut self.renderer,
                         &mut self.assets,
                     )).expect("Cannot execute update systems");
                 },
-                ContextEvent::RenderEvent => {                  
+                ContextEvent::RenderEvent(mut display, mut control_flow) => {                  
                     render_schedule.execute_seq((
                         &mut display,
+                        &mut control_flow,
+                        &mut self.events,
+                        &mut self.resources,
                         &mut self.world,
                         &mut self.renderer,
                         &mut self.assets,
                     )).expect("Cannot execute render systems");
                 },
+                ContextEvent::WindowEvent(display, event) => {
+                    if on_window_event(&mut self.resources, event) {
+                        display.lock().window().request_redraw();
+                    }
+                },
             }
         });
     }
 }
+
+pub type OnEventFn = Box<dyn Fn(&mut Resources, WindowEvent) -> bool>;
+
+fn on_event_empty(_: &mut Resources, _: WindowEvent) -> bool { false }

@@ -10,10 +10,7 @@ use flatbox::{
     render::{
         hal::shader::*,
         pbr::{
-            texture::{
-                Texture,
-                Filter, Order,
-            },
+            texture::{Texture, Order},
             material::Material, 
             model::Model,
             camera::{Camera, CameraType},
@@ -46,8 +43,8 @@ pub struct MyMaterial {
 impl MyMaterial {
     pub fn new(rust_texture: &str, wall_texture: &str) -> FlatboxResult<MyMaterial> {
         Ok(MyMaterial {
-            rust_texture: Texture::new(rust_texture, Filter::Linear)?,
-            wall_texture: Texture::new(wall_texture, Filter::Linear)?,
+            rust_texture: Texture::new(rust_texture, None)?,
+            wall_texture: Texture::new(wall_texture, None)?,
         })
     }
 }
@@ -111,7 +108,7 @@ fn camera(world: SubWorld<With<(&mut Transform, &mut CircleAngle), &Camera>>) {
             transform.translation.z,
         );
 
-        transform.rotation = safe_quat_look_at(
+        transform.rotation = glm::safe_quat_look_at(
             &glm::vec3(0.0, 0.0, 0.0),
             &point,
             &glm::Vec3::y(),
@@ -119,30 +116,5 @@ fn camera(world: SubWorld<With<(&mut Transform, &mut CircleAngle), &Camera>>) {
         );
 
         angle.0 += 0.01;
-    }
-}
-
-fn safe_quat_look_at(
-    look_from: &glm::Vec3,
-    look_to: &glm::Vec3,
-    up: &glm::Vec3,
-    alternative_up: &glm::Vec3,
-) -> glm::Quat {
-    let mut direction: glm::Vec3 = look_to - look_from;
-    let direction_length = glm::length(&direction);
-
-    if direction_length <= 0.0001 {
-        return glm::quat(1.0, 0.0, 0.0, 0.0);
-    }
-
-    direction /= direction_length;
-
-    let dot = glm::dot(&direction, up);
-    let abs = if dot < 0.0 { -dot } else { dot };
-    if abs > 0.9999 {
-        glm::quat_look_at(&direction, alternative_up)
-    }
-    else {
-        glm::quat_look_at(&direction, up)
     }
 }

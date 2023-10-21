@@ -1,21 +1,19 @@
-/*
- * Based on `game-loop` (c) tuzz
- * Licensed under MIT License
- */
-
 #![allow(clippy::arc_with_non_send_sync)]
 
-use std::{time::{Instant, Duration}, sync::Arc};
+use std::{time::{Instant, Duration}, sync::Arc, fmt::Debug};
 use flatbox_core::logger::LoggerLevel;
 use glutin::{
     platform::run_return::EventLoopExtRunReturn,
-    event_loop::{EventLoop, ControlFlow, EventLoopWindowTarget}, 
+    event_loop::{EventLoop, ControlFlow as WinitControlFlow, EventLoopWindowTarget}, 
     window::{Window, Icon, WindowBuilder as GlutinWindowBuilder},
     dpi::{Size, LogicalSize, PhysicalSize},
-    ContextWrapper, PossiblyCurrent, ContextBuilder, GlRequest, Api, event::{Event, WindowEvent},
+    event::Event,
+    ContextWrapper, PossiblyCurrent, ContextBuilder, GlRequest, Api, 
 };
 use parking_lot::{Mutex, MutexGuard};
-use crate::{renderer::WindowExtent, gui::backend::EguiBackend};
+use crate::renderer::WindowExtent;
+
+pub use glutin::event::WindowEvent;
 
 pub type GlContext = ContextWrapper<PossiblyCurrent, Window>;
 
@@ -41,6 +39,37 @@ impl From<PhysicalSize<u32>> for WindowExtent {
             width: size.width as f32, 
             height: size.height as f32,
         }
+    }
+}
+
+#[derive(Default, Clone)]
+pub struct ControlFlow(Arc<Mutex<WinitControlFlow>>);
+
+impl ControlFlow {
+    pub fn new() -> ControlFlow {
+        ControlFlow::default()
+    }
+
+    pub fn set_poll(&self) {
+        *(self.0.lock()) = WinitControlFlow::Poll;
+    }
+
+    pub fn set_wait(&self) {
+        *(self.0.lock()) = WinitControlFlow::Wait;
+    }
+
+    pub fn set_wait_until(&self, instant: Instant) {
+        *(self.0.lock()) = WinitControlFlow::WaitUntil(instant);
+    }
+
+    pub fn exit(&self) {
+        *(self.0.lock()) = WinitControlFlow::Exit;
+    }
+}
+
+impl Debug for ControlFlow {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
     }
 }
 
@@ -82,12 +111,14 @@ impl AsRef<EventLoop<()>> for EventLoopWrapper {
 pub enum ContextEvent {
     ResizeEvent(WindowExtent),
     UpdateEvent,
-    RenderEvent,
+    RenderEvent(Display, ControlFlow),
+    WindowEvent(Display, WindowEvent<'static>),
 }
 
 pub struct Context {
     event_loop: EventLoopWrapper,
     display: Display,
+    control_flow: ControlFlow,
     max_frame_time: Duration,
     exit_next_iteration: bool,
     window_occluded: bool,
@@ -131,6 +162,7 @@ impl Context {
         Context {
             event_loop: EventLoopWrapper::new(event_loop),
             display: Display::new(gl_context),
+            control_flow: ControlFlow::default(),
             max_frame_time: Duration::from_secs_f64(builder.max_frame_time),
             window_occluded: false,
             exit_next_iteration: false,
@@ -146,8 +178,8 @@ impl Context {
         }
     }
 
-    pub fn display(&self) -> &Display {
-        &self.display
+    pub fn display(&self) -> Display {
+        self.display.clone()
     }
 
     pub fn event_loop_target(&self) -> &EventLoopWindowTarget<()> {
@@ -158,8 +190,8 @@ impl Context {
         self.display.lock().get_proc_address(addr)
     }
 
-    pub fn next_frame<F: FnMut(ContextEvent, Display)>(&mut self, mut runner: F) -> bool {
-        if self.exit_next_iteration { return false; }
+    pub fn next_frame<F: FnMut(ContextEvent)>(&mut self, mut runner: F) {
+        if self.exit_next_iteration { return; }
 
         self.current_instant = Instant::now();
 
@@ -171,7 +203,7 @@ impl Context {
         self.accumulated_time += elapsed.as_secs_f64();
 
         while self.accumulated_time >= self.fixed_time_step {
-            (runner)(ContextEvent::UpdateEvent, self.display.clone());
+            (runner)(ContextEvent::UpdateEvent);
 
             self.accumulated_time -= self.fixed_time_step;
             self.number_of_updates += 1;
@@ -182,66 +214,43 @@ impl Context {
         if self.window_occluded {
             std::thread::sleep(Duration::from_secs_f64(self.fixed_time_step));
         } else {
-            (runner)(ContextEvent::RenderEvent, self.display.clone());
+            (runner)(ContextEvent::RenderEvent(
+                self.display.clone(), 
+                self.control_flow.clone(),
+            ));
+
             self.number_of_renders += 1;
         }
 
-        self.previous_instant = self.current_instant;
-
-        true
+        self.previous_instant = self.current_instant;        
     }
 
-    pub fn run<F: FnMut(ContextEvent, Display)>(&mut self, mut runner: F) {
-        let mut egui_backend = EguiBackend::new(&self.display.lock(), self.event_loop.as_ref());
-
-        self.event_loop.take().run_return(move |event, _, control_flow|{  
+    pub fn run<F: FnMut(ContextEvent)>(&mut self, mut runner: F) {
+        self.event_loop.take().run_return(move |event, _, control_flow|{
             match event {
                 Event::LoopDestroyed => (),
                 Event::WindowEvent { event, .. } => {
                     match event {
-                        WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
+                        WindowEvent::CloseRequested => *control_flow = WinitControlFlow::Exit,
                         WindowEvent::Resized(physical_size) => {
                             let size = WindowExtent::from(physical_size);
                             unsafe { gl::Viewport(0, 0, size.width as i32, size.height as i32); }
-                            (runner)(ContextEvent::ResizeEvent(size), self.display.clone());
+                            (runner)(ContextEvent::ResizeEvent(size));
                             self.display.lock().resize(physical_size);
                         },
                         WindowEvent::Occluded(occluded) => self.window_occluded = occluded,
                         _ => {},
                     }
 
-                    if egui_backend.on_event(&event) {
-                        self.display.lock().window().request_redraw();
-                    }
+                    (runner)(ContextEvent::WindowEvent(
+                        self.display.clone(),
+                        event.to_static().unwrap_or(WindowEvent::Focused(true)), 
+                    ));
                 },
                 Event::RedrawRequested(_) => {
                     self.next_frame(&mut runner);
-
-                    let mut quit = false;
-        
-                    let repaint_after = egui_backend.run(&self.display.lock(), |egui_ctx| {
-                        egui::SidePanel::left("my_side_panel").show(egui_ctx, |ui| {
-                            ui.heading("Hello World!");
-                            if ui.button("Quit").clicked() {
-                                quit = true;
-                            }
-                        });
-                    });
-        
-                    *control_flow = if quit {
-                        glutin::event_loop::ControlFlow::Exit
-                    } else if repaint_after.is_zero() {
-                        self.display.lock().window().request_redraw();
-                        glutin::event_loop::ControlFlow::Poll
-                    // } else if let Some(repaint_after_instant) = Instant::now().checked_add(repaint_after) {
-                    //     glutin::event_loop::ControlFlow::WaitUntil(repaint_after_instant)
-                    } else {
-                        *control_flow
-                    };
-        
-                    egui_backend.paint(&self.display.lock());
-    
-    
+                    
+                    *control_flow = *(self.control_flow.0.lock());
                     self.display.lock().swap_buffers().unwrap();
                 },
                 Event::MainEventsCleared => {
@@ -271,7 +280,7 @@ pub struct WindowBuilder {
     pub icon: Option<Icon>,
     /// Specifies logger level and whether it must be initialized
     pub logger_level: LoggerLevel,
-    ///
+    /// 
     pub updates_per_second: u32, 
     ///
     pub max_frame_time: f64
