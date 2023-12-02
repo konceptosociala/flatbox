@@ -81,6 +81,7 @@ impl Camera {
         pipeline.apply();
         pipeline.set_mat4("view", &view_matrix);
         pipeline.set_mat4("projection", &self.projection_matrix);
+        pipeline.set_vec3("viewPos", &transform.translation);
     }
     
     fn update_projection_matrix(&mut self) {

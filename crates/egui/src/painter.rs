@@ -15,11 +15,11 @@ use flatbox_render::{
         buffer::{Buffer, BufferTarget, BufferUsage, VertexArray, AttributeType}
     }, 
     error::RenderError, 
-    pbr::texture::{Filter, Texture, TextureDescriptor, WrapMode, ColorMode, ImageType}
+    pbr::texture::{Filter, Texture, TextureDescriptor, WrapMode, ColorMode, ImageType, Order}, renderer::{Renderer, Capability, WindowExtent, EnableCommand, DisableCommand, ColorMaskCommand, BlendEquationSeparateCommand, ColorBlendMode, BlendFuncSeparateCommand, ColorBlendEquation, ScissorCommand, ActivateTextureRawCommand, DrawTrianglesCommand}
 };
 
-const VERT_SRC: &str = include_str!("../../render/src/shaders/egui.vs");
-const FRAG_SRC: &str = include_str!("../../render/src/shaders/egui.fs");
+const VERT_SRC: &str = include_str!("shaders/egui.vs");
+const FRAG_SRC: &str = include_str!("shaders/egui.fs");
 
 pub trait ToNativeFilter {
     fn to_native(&self) -> Filter;
@@ -57,7 +57,7 @@ pub struct Painter {
     textures_to_destroy: Vec<Texture>,
 }
 
-impl Painter { // FIXME: Painting only with Renderer in scope
+impl Painter {
     pub fn new() -> Result<Painter, RenderError> {
         let vertex_shader = Shader::new_from_source(VERT_SRC, ShaderType::VertexShader)?;
         let fragment_shader = Shader::new_from_source(FRAG_SRC, ShaderType::FragmentShader)?;
@@ -93,42 +93,43 @@ impl Painter { // FIXME: Painting only with Renderer in scope
         self.max_texture_side
     }
 
-    unsafe fn prepare_painting(
+    fn prepare_painting(
         &mut self,
+        renderer: &mut Renderer,
         [width_in_pixels, height_in_pixels]: [u32; 2],
         pixels_per_point: f32,
-    ) -> (u32, u32) {
-        gl::Enable(gl::SCISSOR_TEST);
-        gl::Disable(gl::CULL_FACE);
-        gl::Disable(gl::DEPTH_TEST);
-        gl::ColorMask(gl::TRUE, gl::TRUE, gl::TRUE, gl::TRUE);
-        gl::Enable(gl::BLEND);
-        gl::BlendEquationSeparate(gl::FUNC_ADD, gl::FUNC_ADD);
-        gl::BlendFuncSeparate(
-            gl::ONE,
-            gl::ONE_MINUS_SRC_ALPHA,
-            gl::ONE_MINUS_DST_ALPHA,
-            gl::ONE,
-        );
+    ) -> Result<(u32, u32), RenderError> {
+        renderer.execute(&mut EnableCommand(Capability::ScissorTest))?;
+        renderer.execute(&mut DisableCommand(Capability::CullFace))?;
+        renderer.execute(&mut DisableCommand(Capability::DepthTest))?;
+        renderer.execute(&mut ColorMaskCommand(true, true, true, true))?;
+        renderer.execute(&mut EnableCommand(Capability::Blend))?;
+        renderer.execute(&mut BlendEquationSeparateCommand(ColorBlendEquation::FuncAdd, ColorBlendEquation::FuncAdd))?;
+        renderer.execute(&mut BlendFuncSeparateCommand(
+            ColorBlendMode::One,
+            ColorBlendMode::OneMinusSrcAlpha,
+            ColorBlendMode::OneMinusDstAlpha,
+            ColorBlendMode::One,
+        ))?;
 
         let width_in_points = width_in_pixels as f32 / pixels_per_point;
         let height_in_points = height_in_pixels as f32 / pixels_per_point;
 
-        gl::Viewport(0, 0, width_in_pixels as i32, height_in_pixels as i32);
         self.pipeline.apply();
         self.pipeline.set_vec2("u_screen_size", &glm::vec2(width_in_points, height_in_points));
         self.pipeline.set_int("u_sampler", 0);
 
-        gl::ActiveTexture(gl::TEXTURE0); // FIXME: Activate texture
+        unsafe { renderer.execute(&mut ActivateTextureRawCommand::new(Order::Texture0))?; }
 
         self.vertex_array.bind();
         self.index_buffer.bind();
 
-        (width_in_pixels, height_in_pixels)
+        Ok((width_in_pixels, height_in_pixels))
     }
 
     pub fn paint_and_update_textures(
         &mut self,
+        renderer: &mut Renderer,
         screen_size_px: [u32; 2],
         pixels_per_point: f32,
         clipped_primitives: &[egui::ClippedPrimitive],
@@ -138,7 +139,7 @@ impl Painter { // FIXME: Painting only with Renderer in scope
             self.set_texture(*id, image_delta)?;
         }
 
-        self.paint_primitives(screen_size_px, pixels_per_point, clipped_primitives);
+        self.paint_primitives(renderer, screen_size_px, pixels_per_point, clipped_primitives)?;
 
         for &id in &textures_delta.free {
             self.textures.remove(&id);
@@ -149,22 +150,23 @@ impl Painter { // FIXME: Painting only with Renderer in scope
 
     pub fn paint_primitives(
         &mut self,
+        renderer: &mut Renderer,
         screen_size_px: [u32; 2],
         pixels_per_point: f32,
         clipped_primitives: &[egui::ClippedPrimitive],
-    ) {
-        let size_in_pixels = unsafe { self.prepare_painting(screen_size_px, pixels_per_point) };
+    ) -> Result<(), RenderError> {
+        let size_in_pixels = self.prepare_painting(renderer, screen_size_px, pixels_per_point)?;
 
         for egui::ClippedPrimitive {
             clip_rect,
             primitive,
         } in clipped_primitives
         {
-            set_clip_rect(size_in_pixels, pixels_per_point, *clip_rect);
+            set_clip_rect(renderer, size_in_pixels, pixels_per_point, *clip_rect)?;
 
             match primitive {
                 Primitive::Mesh(mesh) => {
-                    self.paint_mesh(mesh);
+                    self.paint_mesh(renderer, mesh)?;
                 }
                 Primitive::Callback(callback) => {
                     if callback.rect.is_positive() {
@@ -179,14 +181,12 @@ impl Painter { // FIXME: Painting only with Renderer in scope
                         let rect_max_x = rect_max_x.round() as i32;
                         let rect_max_y = rect_max_y.round() as i32;
 
-                        unsafe {
-                            gl::Viewport(
-                                rect_min_x,
-                                size_in_pixels.1 as i32 - rect_max_y,
-                                rect_max_x - rect_min_x,
-                                rect_max_y - rect_min_y,
-                            );
-                        }
+                        renderer.set_extent(WindowExtent {
+                            x: rect_min_x as f32,
+                            y: (size_in_pixels.1 as i32 - rect_max_y) as f32,
+                            width: (rect_max_x - rect_min_x) as f32,
+                            height: (rect_max_y - rect_min_y) as f32,
+                        });
 
                         let info = egui::PaintCallbackInfo {
                             viewport: callback.rect,
@@ -201,39 +201,37 @@ impl Painter { // FIXME: Painting only with Renderer in scope
                             warn!("Warning: Unsupported render callback. Expected egui_gl::CallbackFn");
                         }
 
-                        // Restore state:
-                        unsafe { self.prepare_painting(screen_size_px, pixels_per_point) };
+                        self.prepare_painting(renderer, screen_size_px, pixels_per_point)?;
                     }
                 }
             }
         }
 
-        unsafe {
-            self.vertex_array.unbind();
-            self.index_buffer.unbind();
-            gl::Disable(gl::SCISSOR_TEST);
-        }
+        self.vertex_array.unbind();
+        self.index_buffer.unbind();
+        renderer.execute(&mut DisableCommand(Capability::ScissorTest))?;
+
+        Ok(())
     }
 
     #[inline(never)]
-    fn paint_mesh(&mut self, mesh: &Mesh) {
+    fn paint_mesh(
+        &mut self, 
+        renderer: &mut Renderer, 
+        mesh: &Mesh
+    ) -> Result<(), RenderError> {
         debug_assert!(mesh.is_valid());
         if let Some(texture) = self.texture(mesh.texture_id) {
             self.vertex_buffer.fill(&mesh.vertices);
             self.index_buffer.fill(&mesh.indices);
             texture.bind();
 
-            unsafe {
-                gl::DrawElements(
-                    gl::TRIANGLES,
-                    mesh.indices.len() as i32,
-                    gl::UNSIGNED_INT,
-                    std::ptr::null(),
-                );
-            }
+            unsafe { renderer.execute(&mut DrawTrianglesCommand::new(mesh.indices.len()))?; }
         } else {
             warn!("Failed to find texture {:?}", mesh.texture_id);
         }
+
+        Ok(())
     }
 
     pub fn set_texture(
@@ -341,10 +339,11 @@ impl Painter { // FIXME: Painting only with Renderer in scope
 }
 
 fn set_clip_rect(
+    renderer: &mut Renderer,
     size_in_pixels: (u32, u32), 
     pixels_per_point: f32, 
     clip_rect: Rect,
-){
+) -> Result<(), RenderError> {
     // Transform clip rect to physical pixels:
     let clip_min_x = pixels_per_point * clip_rect.min.x;
     let clip_min_y = pixels_per_point * clip_rect.min.y;
@@ -352,24 +351,24 @@ fn set_clip_rect(
     let clip_max_y = pixels_per_point * clip_rect.max.y;
 
     // Round to integer:
-    let clip_min_x = clip_min_x.round() as i32;
-    let clip_min_y = clip_min_y.round() as i32;
-    let clip_max_x = clip_max_x.round() as i32;
-    let clip_max_y = clip_max_y.round() as i32;
+    let clip_min_x = clip_min_x.round();
+    let clip_min_y = clip_min_y.round();
+    let clip_max_x = clip_max_x.round();
+    let clip_max_y = clip_max_y.round();
 
     // Clamp:
-    let clip_min_x = clip_min_x.clamp(0, size_in_pixels.0 as i32);
-    let clip_min_y = clip_min_y.clamp(0, size_in_pixels.1 as i32);
-    let clip_max_x = clip_max_x.clamp(clip_min_x, size_in_pixels.0 as i32);
-    let clip_max_y = clip_max_y.clamp(clip_min_y, size_in_pixels.1 as i32);
+    let clip_min_x = clip_min_x.clamp(0.0, size_in_pixels.0 as f32);
+    let clip_min_y = clip_min_y.clamp(0.0, size_in_pixels.1 as f32);
+    let clip_max_x = clip_max_x.clamp(clip_min_x, size_in_pixels.0 as f32);
+    let clip_max_y = clip_max_y.clamp(clip_min_y, size_in_pixels.1 as f32);
 
-    unsafe {
-        gl::Scissor(
-            clip_min_x,
-            size_in_pixels.1 as i32 - clip_max_y,
-            clip_max_x - clip_min_x,
-            clip_max_y - clip_min_y,
-        );
-    }
+    renderer.execute(&mut ScissorCommand(WindowExtent { 
+        x:      clip_min_x, 
+        y:      size_in_pixels.1 as f32 - clip_max_y, 
+        width:  clip_max_x - clip_min_x, 
+        height: clip_max_y - clip_min_y, 
+    }))?;
+
+    Ok(())
 }
 

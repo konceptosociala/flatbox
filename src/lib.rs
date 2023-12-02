@@ -1,5 +1,4 @@
 use std::any::TypeId;
-use extension::RenderGuiExtension;
 use pretty_type_name::pretty_type_name;
 use flatbox_assets::{manager::AssetManager, resources::{Resources, Resource}};
 use flatbox_core::logger::FlatboxLogger;
@@ -145,8 +144,9 @@ impl Flatbox {
     pub fn add_default_extensions(&mut self) -> &mut Self {
         self
             .add_extension(BaseRenderExtension)
-            .add_extension(RenderMaterialExtension::<DefaultMaterial>::new())
-            .add_extension(RenderGuiExtension)
+            .add_extension(RenderMaterialExtension::<DefaultMaterial>::new());
+
+        self
     }
 
     pub fn run(&mut self){

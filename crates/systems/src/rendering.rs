@@ -6,11 +6,12 @@ use flatbox_render::{
         material::Material, 
         model::Model, camera::Camera,
     }, 
-    renderer::{Renderer, PrepareModelCommand, DrawModelCommand, ClearCommand, RenderCameraCommand}, error::RenderError
+    renderer::{Renderer, PrepareModelCommand, DrawModelCommand, ClearCommand, RenderCameraCommand}, 
+    error::RenderError,
 };
 
 pub fn clear_screen(mut renderer: Write<Renderer>) -> Result<()> {
-    renderer.execute(&mut ClearCommand)?;
+    renderer.execute(&mut ClearCommand(0.1, 0.1, 0.1))?;
     
     Ok(())
 }

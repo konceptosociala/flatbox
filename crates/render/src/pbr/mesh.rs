@@ -1,6 +1,7 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, sync::Arc};
+use parking_lot::Mutex;
 use serde::{Serialize, Deserialize};
-use flatbox_assets::AssetHandle;
+use flatbox_core::math::glm;
 
 use crate::{
     macros::set_vertex_attribute,
@@ -10,20 +11,53 @@ use crate::{
     }, 
 };
 
+#[allow(unused_imports)]
+use crate::pbr::model::Model;
+
+use super::material::Material;
+
 #[repr(C)]
 #[derive(Debug, Default, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub struct Vertex {
-    pub position: [f32; 3],
-    pub normal: [f32; 3],
-    pub texcoord: [f32; 2],
+    pub position: glm::Vec3,
+    pub normal: glm::Vec3,
+    pub texcoord: glm::Vec2,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+impl Vertex {
+    /// Get middle point between two vertices
+    pub fn midpoint(a: &Vertex, b: &Vertex) -> Vertex {
+        Vertex {
+            position: glm::vec3(
+                0.5 * (a.position[0] + b.position[0]),
+                0.5 * (a.position[1] + b.position[1]),
+                0.5 * (a.position[2] + b.position[2]),
+            ),
+            normal: Self::normalize(glm::vec3(
+                0.5 * (a.normal[0] + b.normal[0]),
+                0.5 * (a.normal[1] + b.normal[1]),
+                0.5 * (a.normal[2] + b.normal[2]),
+            )),
+            texcoord: glm::vec2(
+                0.5 * (a.texcoord[0] + b.texcoord[0]),
+                0.5 * (a.texcoord[1] + b.texcoord[1]),
+            ),
+        }
+    }
+    
+    /// Normalize vector/vertex. Returns vector with the same direction and `1` lenght
+    pub fn normalize(v: glm::Vec3) -> glm::Vec3 {
+        let l = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt();
+        glm::vec3(v[0] / l, v[1] / l, v[2] / l)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Primitive {
     pub first_index: u32,
     pub index_count: u32,
     /// Handle of material, which is attached to rendered mesh primitive
-    pub material: AssetHandle,
+    pub material: Arc<Mutex<Box<dyn Material>>>,
 }
 
 /// Represents the type of mesh in [`Model`] struct.
@@ -81,35 +115,35 @@ impl Mesh {
     pub fn cube() -> Mesh {
         Mesh::new(
             &[
-                Vertex { position: [-0.5,0.5,-0.5], normal: [0.0, 0.0, 0.0], texcoord: [0.0, 0.0] },
-                Vertex { position: [-0.5,-0.5,-0.5], normal: [0.0, 0.0, 0.0], texcoord: [0.0, 1.0] },
-                Vertex { position: [0.5,-0.5,-0.5], normal: [0.0, 0.0, 0.0], texcoord: [1.0, 1.0] },
-                Vertex { position: [0.5,0.5,-0.5], normal: [0.0, 0.0, 0.0], texcoord: [1.0, 0.0] },
+                Vertex { position: glm::vec3(-0.5,0.5,-0.5), normal: glm::vec3(0.0, 0.0, -1.0), texcoord: glm::vec2(0.0, 0.0) },
+                Vertex { position: glm::vec3(-0.5,-0.5,-0.5), normal: glm::vec3(0.0, 0.0, -1.0), texcoord: glm::vec2(0.0, 1.0) },
+                Vertex { position: glm::vec3(0.5,-0.5,-0.5), normal: glm::vec3(0.0, 0.0, -1.0), texcoord: glm::vec2(1.0, 1.0) },
+                Vertex { position: glm::vec3(0.5,0.5,-0.5), normal: glm::vec3(0.0, 0.0, -1.0), texcoord: glm::vec2(1.0, 0.0) },
 
-                Vertex { position: [-0.5,0.5,0.5], normal: [0.0, 0.0, 0.0], texcoord: [0.0, 0.0] },
-                Vertex { position: [-0.5,-0.5,0.5], normal: [0.0, 0.0, 0.0], texcoord: [0.0, 1.0] },
-                Vertex { position: [0.5,-0.5,0.5], normal: [0.0, 0.0, 0.0], texcoord: [1.0, 1.0] },
-                Vertex { position: [0.5,0.5,0.5], normal: [0.0, 0.0, 0.0], texcoord: [1.0, 0.0] },
+                Vertex { position: glm::vec3(-0.5,0.5,0.5), normal: glm::vec3(0.0, 0.0, 1.0), texcoord: glm::vec2(0.0, 0.0) },
+                Vertex { position: glm::vec3(-0.5,-0.5,0.5), normal: glm::vec3(0.0, 0.0, 1.0), texcoord: glm::vec2(0.0, 1.0) },
+                Vertex { position: glm::vec3(0.5,-0.5,0.5), normal: glm::vec3(0.0, 0.0, 1.0), texcoord: glm::vec2(1.0, 1.0) },
+                Vertex { position: glm::vec3(0.5,0.5,0.5), normal: glm::vec3(0.0, 0.0, 1.0), texcoord: glm::vec2(1.0, 0.0) },
 
-                Vertex { position: [0.5,0.5,-0.5], normal: [0.0, 0.0, 0.0], texcoord: [0.0, 0.0] },
-                Vertex { position: [0.5,-0.5,-0.5], normal: [0.0, 0.0, 0.0], texcoord: [0.0, 1.0] },
-                Vertex { position: [0.5,-0.5,0.5], normal: [0.0, 0.0, 0.0], texcoord: [1.0, 1.0] },
-                Vertex { position: [0.5,0.5,0.5], normal: [0.0, 0.0, 0.0], texcoord: [1.0, 0.0] },
+                Vertex { position: glm::vec3(0.5,0.5,-0.5), normal: glm::vec3(1.0, 0.0, 0.0), texcoord: glm::vec2(0.0, 0.0) },
+                Vertex { position: glm::vec3(0.5,-0.5,-0.5), normal: glm::vec3(1.0, 0.0, 0.0), texcoord: glm::vec2(0.0, 1.0) },
+                Vertex { position: glm::vec3(0.5,-0.5,0.5), normal: glm::vec3(1.0, 0.0, 0.0), texcoord: glm::vec2(1.0, 1.0) },
+                Vertex { position: glm::vec3(0.5,0.5,0.5), normal: glm::vec3(1.0, 0.0, 0.0), texcoord: glm::vec2(1.0, 0.0) },
 
-                Vertex { position: [-0.5,0.5,-0.5], normal: [0.0, 0.0, 0.0], texcoord: [0.0, 0.0] },
-                Vertex { position: [-0.5,-0.5,-0.5], normal: [0.0, 0.0, 0.0], texcoord: [0.0, 1.0] },
-                Vertex { position: [-0.5,-0.5,0.5], normal: [0.0, 0.0, 0.0], texcoord: [1.0, 1.0] },
-                Vertex { position: [-0.5,0.5,0.5], normal: [0.0, 0.0, 0.0], texcoord: [1.0, 0.0] },
+                Vertex { position: glm::vec3(-0.5,0.5,-0.5), normal: glm::vec3(-1.0, 0.0, 0.0), texcoord: glm::vec2(0.0, 0.0) },
+                Vertex { position: glm::vec3(-0.5,-0.5,-0.5), normal: glm::vec3(-1.0, 0.0, 0.0), texcoord: glm::vec2(0.0, 1.0) },
+                Vertex { position: glm::vec3(-0.5,-0.5,0.5), normal: glm::vec3(-1.0, 0.0, 0.0), texcoord: glm::vec2(1.0, 1.0) },
+                Vertex { position: glm::vec3(-0.5,0.5,0.5), normal: glm::vec3(-1.0, 0.0, 0.0), texcoord: glm::vec2(1.0, 0.0) },
 
-                Vertex { position: [-0.5,0.5,0.5], normal: [0.0, 0.0, 0.0], texcoord: [0.0, 0.0] },
-                Vertex { position: [-0.5,0.5,-0.5], normal: [0.0, 0.0, 0.0], texcoord: [0.0, 1.0] },
-                Vertex { position: [0.5,0.5,-0.5], normal: [0.0, 0.0, 0.0], texcoord: [1.0, 1.0] },
-                Vertex { position: [0.5,0.5,0.5], normal: [0.0, 0.0, 0.0], texcoord: [1.0, 0.0] },
+                Vertex { position: glm::vec3(-0.5,0.5,0.5), normal: glm::vec3(0.0, 1.0, 0.0), texcoord: glm::vec2(0.0, 0.0) },
+                Vertex { position: glm::vec3(-0.5,0.5,-0.5), normal: glm::vec3(0.0, 1.0, 0.0), texcoord: glm::vec2(0.0, 1.0) },
+                Vertex { position: glm::vec3(0.5,0.5,-0.5), normal: glm::vec3(0.0, 1.0, 0.0), texcoord: glm::vec2(1.0, 1.0) },
+                Vertex { position: glm::vec3(0.5,0.5,0.5), normal: glm::vec3(0.0, 1.0, 0.0), texcoord: glm::vec2(1.0, 0.0) },
 
-                Vertex { position: [-0.5,-0.5,0.5], normal: [0.0, 0.0, 0.0], texcoord: [0.0, 0.0] },
-                Vertex { position: [-0.5,-0.5,-0.5], normal: [0.0, 0.0, 0.0], texcoord: [0.0, 1.0] },
-                Vertex { position: [0.5,-0.5,-0.5], normal: [0.0, 0.0, 0.0], texcoord: [1.0, 1.0] },
-                Vertex { position: [0.5,-0.5,0.5], normal: [0.0, 0.0, 0.0], texcoord: [1.0, 0.0] },
+                Vertex { position: glm::vec3(-0.5,-0.5,0.5), normal: glm::vec3(0.0, -1.0, 0.0), texcoord: glm::vec2(0.0, 0.0) },
+                Vertex { position: glm::vec3(-0.5,-0.5,-0.5), normal: glm::vec3(0.0, -1.0, 0.0), texcoord: glm::vec2(0.0, 1.0) },
+                Vertex { position: glm::vec3(0.5,-0.5,-0.5), normal: glm::vec3(0.0, -1.0, 0.0), texcoord: glm::vec2(1.0, 1.0) },
+                Vertex { position: glm::vec3(0.5,-0.5,0.5), normal: glm::vec3(0.0, -1.0, 0.0), texcoord: glm::vec2(1.0, 0.0) },
             ],
             &[
                 0,1,3, 3,1,2,

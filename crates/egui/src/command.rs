@@ -27,7 +27,7 @@ impl<'a> DrawEguiCommand<'a> {
 
 impl<'a> RenderCommand for DrawEguiCommand<'a> {
     fn execute(&mut self, renderer: &mut Renderer) -> Result<(), RenderError> {       
-        self.egui.paint(renderer.extent()).catch();
+        self.egui.paint(renderer).catch();
 
         Ok(())
     }

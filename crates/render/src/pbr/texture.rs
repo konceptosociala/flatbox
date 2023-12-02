@@ -5,7 +5,7 @@ use flatbox_assets::{
     typetag,
 };
 use gl::types::GLuint;
-use image::EncodableLayout;
+use image::{EncodableLayout, ImageBuffer, Rgba};
 use serde::{Serialize, Deserialize};
 
 use crate::{
@@ -76,7 +76,8 @@ impl Default for TextureDescriptor {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+// FIXME: texture serde, clone, debug
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Texture {
     id: GLuint,
 }
@@ -158,6 +159,17 @@ impl Texture {
         };
 
         Ok(texture)
+    }
+}
+
+impl Default for Texture {
+    fn default() -> Self {
+        let img = ImageBuffer::from_fn(16, 16, |_, _| Rgba::<u8>([255, 255, 255, 255])).into_raw();
+
+        Texture::new_from_raw(&img, 16, 16, Some(TextureDescriptor {
+            filter: Filter::Nearest,
+            ..Default::default()
+        })).unwrap()
     }
 }
 

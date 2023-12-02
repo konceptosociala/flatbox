@@ -1,5 +1,3 @@
-#![allow(clippy::arc_with_non_send_sync)]
-
 use std::{time::{Instant, Duration}, sync::Arc, fmt::Debug};
 use flatbox_core::logger::LoggerLevel;
 use glutin::{
@@ -22,6 +20,8 @@ pub struct Display(Arc<Mutex<GlContext>>);
 
 impl Display {
     pub fn new(context: GlContext) -> Display {
+
+        #[allow(clippy::arc_with_non_send_sync)]
         Display(Arc::new(Mutex::new(context)))
     }
 
@@ -36,6 +36,8 @@ unsafe impl Sync for Display {}
 impl From<PhysicalSize<u32>> for WindowExtent {
     fn from(size: PhysicalSize<u32>) -> Self {
         WindowExtent { 
+            x: 0.0,
+            y: 0.0,
             width: size.width as f32, 
             height: size.height as f32,
         }
@@ -234,7 +236,6 @@ impl Context {
                         WindowEvent::CloseRequested => *control_flow = WinitControlFlow::Exit,
                         WindowEvent::Resized(physical_size) => {
                             let size = WindowExtent::from(physical_size);
-                            unsafe { gl::Viewport(0, 0, size.width as i32, size.height as i32); }
                             (runner)(ContextEvent::ResizeEvent(size));
                             self.display.lock().resize(physical_size);
                         },

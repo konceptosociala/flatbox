@@ -256,16 +256,3 @@ macro_rules! impl_save_load {
         }
     };
 }
-
-#[derive(Default)]
-struct MySaveLoader {
-    components: Vec<String>,
-}
-
-impl_save_load! {
-    loader: MySaveLoader, 
-    components: [
-        u32, 
-        bool
-    ]
-}

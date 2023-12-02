@@ -2,7 +2,6 @@ use std::fs::read_to_string;
 use std::path::Path;
 use std::ptr;
 use std::string::FromUtf8Error;
-
 use thiserror::Error;
 use gl::types::{GLuint, GLint};
 use flatbox_core::math::glm;

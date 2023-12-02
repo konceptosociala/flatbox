@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use std::path::Path;
 use std::fs::{File, read_to_string};
+use parking_lot::Mutex;
 use ron::ser::{Serializer, PrettyConfig};
 use serde::{Serialize, Deserialize};
 use flatbox_ecs::{World, EntityBuilder};
@@ -15,7 +16,7 @@ use crate::{
 #[derive(Default, Serialize, Deserialize)]
 #[serde(rename = "Entity")]
 pub struct SerializableEntity {
-    pub components: Vec<Arc<dyn SerializableComponent + 'static>>
+    pub components: Vec<Arc<Mutex<Box<dyn SerializableComponent + 'static>>>>
 }
 
 /// Macro for easy [`SerializableEntity`] creation. Often used along with
@@ -33,11 +34,12 @@ pub struct SerializableEntity {
 macro_rules! entity {
     [$( $comp:expr ),+] => {
         {
-            use std::sync::Arc;
+            use ::std::sync::Arc;
+            use $crate::parking_lot::Mutex;
 
             let mut entity = SerializableEntity::default();
             $(
-                entity.components.push(Arc::new($comp));
+                entity.components.push(Arc::new(Mutex::new(Box::new($comp))));
             )+
             entity
         }
@@ -126,23 +128,21 @@ macro_rules! scene {
 }
 
 pub trait SpawnSceneExt {
-    fn spawn_scene(&mut self, scene: Scene, asset_manager: &mut AssetManager);
+    fn spawn_scene(&mut self, scene: Scene);
 }
 
 impl SpawnSceneExt for World {
-    fn spawn_scene(&mut self, scene: Scene, asset_manager: &mut AssetManager) {
+    fn spawn_scene(&mut self, scene: Scene) {
         self.clear();
 
         for entity in scene.entities {
             let mut entity_builder = EntityBuilder::new();
             
             for component in entity.components {
-                component.add_into(&mut entity_builder);
+                component.lock().add_into(&mut entity_builder);
             }
             
             self.spawn(entity_builder.build());
-        }
-        
-        *asset_manager = scene.assets;
+        }        
     }
 }

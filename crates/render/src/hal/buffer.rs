@@ -127,7 +127,7 @@ impl VertexArray {
         unsafe { gl::BindVertexArray(0); }
     }
 
-    /// set attribute
+    /// Set attribute
     /// 
     /// ## Safety
     /// 

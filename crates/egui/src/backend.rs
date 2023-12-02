@@ -1,11 +1,10 @@
 use std::sync::Arc;
-use glutin::event::WindowEvent;
 use parking_lot::Mutex;
 
 use flatbox_render::{
     error::RenderError, 
-    context::{Context, Display},
-    renderer::WindowExtent,
+    context::{Context, Display, WindowEvent},
+    renderer::Renderer,
 };
 use crate::{
     painter::Painter, 
@@ -40,6 +39,10 @@ impl EguiBackend {
         }
     }
 
+    pub fn context(&self) -> &egui::Context {
+        &self.egui_ctx
+    }
+
     pub fn on_event(&mut self, event: &WindowEvent<'_>) -> bool {
         self.state.lock().on_event(&self.egui_ctx, event)
     }
@@ -66,15 +69,16 @@ impl EguiBackend {
         repaint_after
     }
 
-    pub fn paint(&mut self, extent: WindowExtent) -> Result<(), RenderError> {
+    pub fn paint(&mut self, renderer: &mut Renderer) -> Result<(), RenderError> {
         let shapes = std::mem::take(&mut self.shapes);
         let textures_delta = std::mem::take(&mut self.textures_delta);
         let clipped_primitives = self.egui_ctx.tessellate(shapes);
 
         let pixels_per_point = self.egui_ctx.pixels_per_point();
-        let screen_size_px = extent.into();
+        let screen_size_px = renderer.extent().into();
 
         self.painter.paint_and_update_textures(
+            renderer,
             screen_size_px,
             pixels_per_point,
             &clipped_primitives,

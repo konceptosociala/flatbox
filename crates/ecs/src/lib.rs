@@ -1,4 +1,4 @@
-pub mod event;
+use std::collections::HashMap;
 
 pub use hecs::{
     *,
@@ -14,4 +14,6 @@ pub use hecs_schedule::{
     Access, Batch, CommandBuffer, QueryOne,
 };
 
-pub type Schedules = std::collections::HashMap<&'static str, ScheduleBuilder>;
+pub mod event;
+
+pub type Schedules = HashMap<&'static str, ScheduleBuilder>;

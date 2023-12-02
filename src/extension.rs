@@ -2,6 +2,7 @@ use std::marker::PhantomData;
 use std::any::TypeId;
 use std::fmt::Debug;
 use flatbox_render::pbr::material::Material;
+#[cfg(feature = "egui")]
 use flatbox_egui::{
     command::render_egui, 
     backend::EguiBackend
@@ -55,9 +56,11 @@ impl<M: Material> Default for RenderMaterialExtension<M> {
     }
 }
 
+#[cfg(feature = "egui")]
 #[derive(Debug)]
 pub struct RenderGuiExtension;
 
+#[cfg(feature = "egui")]
 impl Extension for RenderGuiExtension {
     fn apply(&self, app: &mut Flatbox) {
         app

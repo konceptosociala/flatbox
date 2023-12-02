@@ -25,11 +25,14 @@ impl Transform {
         Transform { rotation, ..Default::default() }
     }
 
-    pub fn to_matrix(&self) -> glm::Mat4 {
-        glm::Mat4::identity()
+    pub fn to_matrices(&self) -> (glm::Mat4, glm::Mat4) {
+        let matrix = glm::Mat4::identity()
             * glm::translation(&self.translation)
             * glm::quat_cast(&self.rotation)
-            * glm::scaling(&glm::vec3(self.scale, self.scale, self.scale))
+            * glm::scaling(&glm::vec3(self.scale, self.scale, self.scale));
+
+        let inversed = matrix.try_inverse().unwrap();
+        (matrix, inversed)
     }
 }
 

@@ -1,3 +1,4 @@
+use flatbox_assets::{impl_ser_component, typetag};
 use flatbox_core::math::transform::Transform;
 use serde::{
     Serialize, 
@@ -157,6 +158,8 @@ impl<'de> Deserialize<'de> for Model {
         deserializer.deserialize_struct("Model", FIELDS, ModelVisitor)
     }
 }
+
+impl_ser_component!(Model);
 
 pub struct ModelBundle<M: Material> {
     pub model: Model,
