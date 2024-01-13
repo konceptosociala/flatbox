@@ -66,6 +66,7 @@ glenum_wrapper! {
     ]
 }
 
+#[repr(C)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, PartialOrd)]
 pub struct WindowExtent {
     pub x: f32,

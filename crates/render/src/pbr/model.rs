@@ -15,7 +15,7 @@ use crate::pbr::{
     material::Material,
 };
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 #[readonly::make]
 pub struct Model {
     /// Model mesh type. It can be selected manually and is
@@ -30,6 +30,15 @@ impl Model {
         Model {
             mesh_type: MeshType::Cube,
             mesh: Some(Mesh::cube()),
+        }
+    }
+}
+
+impl Default for Model {
+    fn default() -> Self {
+        Model {
+            mesh_type: MeshType::default(),
+            mesh: Some(Mesh::default()),
         }
     }
 }

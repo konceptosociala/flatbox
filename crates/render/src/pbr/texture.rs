@@ -91,10 +91,6 @@ impl Texture {
         Texture::new_from_raw(img.as_bytes(), img.width(), img.height(), descr)
     }
 
-    pub fn from_raw(id: GLuint) -> Texture {
-        Texture { id }
-    }
-
     pub fn new_from_raw(
         buf: &[u8], 
         width: u32, 
@@ -177,4 +173,31 @@ impl Drop for Texture {
     fn drop(&mut self) {
         unsafe { gl::DeleteTextures(1, [self.id].as_ptr()); }
     }
+}
+
+pub fn load_image_from_memory(buf: &[u8]) -> Option<(Vec<u8>, u32, u32)> {
+    match image::load_from_memory(buf) {
+        Ok(img) => {
+            let img = img.into_rgba8();
+            let width = img.width();
+            let height = img.height();
+            
+            Some((img.into_raw(), width, height))
+        },
+        _ => None,
+    }
+}
+
+#[macro_export]
+macro_rules! include_texture {
+    ($file:expr $(,)?) => {
+        {
+            let buf = include_bytes!($file);
+            let img = $crate::pbr::texture::load_image_from_memory(buf)
+                .expect(format!("Cannot load `{}`", $file).as_str());
+            
+            Texture::new_from_raw(&img.0, img.1, img.2, None)
+                .expect(format!("Cannot create texture from `{}`", $file).as_str())
+        }
+    };
 }

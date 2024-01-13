@@ -83,7 +83,7 @@ impl Drop for Shader {
 }
 
 pub struct GraphicsPipeline {
-    pub id: GLuint,
+    id: GLuint,
 }
 
 impl GraphicsPipeline {

@@ -18,7 +18,7 @@ pub trait Material: Debug + Send + Sync + 'static {
     where 
         Self: Sized;
 
-    fn setup_pipeline(&self, pipeline: &GraphicsPipeline);
+    fn setup_pipeline(&self, _pipeline: &GraphicsPipeline) {}
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

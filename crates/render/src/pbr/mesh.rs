@@ -83,7 +83,7 @@ pub enum MeshType {
     Generic,
 }
 
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Mesh {
     pub vertex_data: Vec<Vertex>,
     pub index_data: Vec<u32>,
@@ -184,6 +184,12 @@ impl Mesh {
             vertex_buffer.fill(&self.vertex_data);
             index_buffer.fill(&self.index_data);
         }
+    }
+}
+
+impl Default for Mesh {
+    fn default() -> Self {
+        Mesh::cube()
     }
 }
 
