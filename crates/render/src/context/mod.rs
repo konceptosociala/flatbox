@@ -25,7 +25,7 @@ impl Display {
         Display(Arc::new(Mutex::new(context)))
     }
 
-    pub fn lock(&self) -> MutexGuard<ContextWrapper<PossiblyCurrent, Window>> {
+    pub fn lock(&self) -> MutexGuard<GlContext> {
         self.0.lock()
     }
 }

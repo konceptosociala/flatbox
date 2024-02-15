@@ -6,10 +6,7 @@ use flatbox_render::{
     context::{Context, Display, WindowEvent},
     renderer::Renderer,
 };
-use crate::{
-    painter::Painter, 
-    GuiContext
-};
+use crate::painter::Painter;
 
 pub struct EguiBackend {
     pub egui_ctx: egui::Context,
@@ -31,7 +28,7 @@ impl EguiBackend {
         state.set_pixels_per_point(pixels_per_point);
 
         Self {
-            egui_ctx: GuiContext::default(),
+            egui_ctx: egui::Context::default(),
             state: Arc::new(Mutex::new(state)),
             painter,
             shapes: Default::default(),

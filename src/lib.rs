@@ -2,7 +2,7 @@ use std::any::TypeId;
 use pretty_type_name::pretty_type_name;
 use flatbox_assets::{manager::AssetManager, resources::{Resources, Resource}};
 use flatbox_core::logger::FlatboxLogger;
-use flatbox_ecs::{World, Schedules, Schedule, System, event::{EventHandler, Events, Event}};
+use flatbox_ecs::{event::{AppExit, Event, EventHandler, Events}, Schedule, Schedules, System, World};
 use flatbox_render::{
     renderer::Renderer,
     context::{Context, WindowBuilder, ContextEvent, WindowEvent}, 
@@ -27,8 +27,12 @@ pub mod ecs {
     pub use flatbox_ecs::*;
 }
 
+pub mod egui {
+    pub use flatbox_egui::*;
+}
+
 pub mod macros {
-    pub use flatbox_macros::*;
+    // pub use flatbox_macros::*;
 }
 
 pub mod render {
@@ -134,8 +138,10 @@ impl Flatbox {
     }
 
     pub fn add_extension<E: Extension + 'static>(&mut self, extension: E) -> &mut Self {
-        if self.extensions.insert(TypeId::of::<E>(), Box::new(extension)).is_some() {
+        if self.extensions.contains(&TypeId::of::<E>()) {
             panic!("Extension `{}` is already added!", pretty_type_name::<E>());
+        } else {
+            extension.apply(self);
         }
 
         self
@@ -150,17 +156,13 @@ impl Flatbox {
     }
 
     pub fn run(&mut self){
-        let extensions = std::mem::take(&mut self.extensions);
-
-        for ext in extensions.values() {
-            ext.apply(self);
-        }
-
         let on_window_event = std::mem::replace(&mut self.on_window_event, Box::new(on_event_empty));
 
         let mut render_schedule = self.schedules.get_mut("render").unwrap().build();
         let mut setup_schedule = self.schedules.get_mut("setup").unwrap().build();
         let mut update_schedule = self.schedules.get_mut("update").unwrap().build();
+
+        self.events.push_handler(EventHandler::<AppExit>::new());
 
         setup_schedule.execute_seq((
             &mut self.events,

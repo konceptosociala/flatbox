@@ -112,6 +112,10 @@ impl Mesh {
         }
     }
 
+    pub fn empty() -> Mesh {
+        Mesh::new(&[], &[], &[])
+    }
+
     pub fn cube() -> Mesh {
         Mesh::new(
             &[

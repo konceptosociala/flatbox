@@ -37,7 +37,7 @@ impl Resources {
         None
     }
 
-    pub fn get_resource_mut<R: Resource>(&mut self) -> Option<MappedRwLockWriteGuard<R>> {
+    pub fn get_resource_mut<R: Resource>(&self) -> Option<MappedRwLockWriteGuard<R>> {
         if let Some(res) = self.res.get(&TypeId::of::<R>()) {
             let data = match res.try_write() {
                 Some(data) => data,
@@ -50,5 +50,9 @@ impl Resources {
         }
 
         None
+    }
+
+    pub fn remove_resource<R: Resource>(&mut self) {
+        self.res.remove(&TypeId::of::<R>());
     }
 }

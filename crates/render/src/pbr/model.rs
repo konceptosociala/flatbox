@@ -26,6 +26,13 @@ pub struct Model {
 }
 
 impl Model {
+    pub fn new(mesh_type: MeshType, mesh: Mesh) -> Model {
+        Model {
+            mesh_type,
+            mesh: Some(mesh),
+        }
+    }
+
     pub fn cube() -> Model {
         Model {
             mesh_type: MeshType::Cube,

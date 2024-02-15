@@ -3,12 +3,8 @@ use std::any::TypeId;
 use std::fmt::Debug;
 use flatbox_render::pbr::material::Material;
 #[cfg(feature = "egui")]
-use flatbox_egui::{
-    command::render_egui, 
-    backend::EguiBackend
-};
+use flatbox_egui::backend::EguiBackend;
 use flatbox_systems::rendering::{render_material, clear_screen, bind_material};
-use indexmap::IndexMap;
 
 use crate::Flatbox;
  
@@ -16,7 +12,7 @@ pub trait Extension: Debug {
     fn apply(&self, app: &mut Flatbox);
 }
 
-pub type Extensions = IndexMap<TypeId, Box<dyn Extension>>;
+pub type Extensions = Vec<TypeId>;
 
 #[derive(Default, Debug)]
 pub struct BaseRenderExtension;
@@ -65,7 +61,6 @@ impl Extension for RenderGuiExtension {
     fn apply(&self, app: &mut Flatbox) {
         app
             .add_resource(EguiBackend::new(&app.context))
-            .add_render_system(render_egui)
             .set_on_window_event(|resources, event| {
                 resources.get_resource_mut::<EguiBackend>().unwrap().on_event(&event)
             });

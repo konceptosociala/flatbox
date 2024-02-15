@@ -1,22 +1,19 @@
+use std::time::Instant;
+
 use anyhow::Result;
 use flatbox::{
-    Flatbox,
     core::math::{
-        transform::Transform,
-        glm,
-    },
-    ecs::{Write, CommandBuffer},
-    render::{
-        pbr::{
-            texture::Texture,
-            material::DefaultMaterial, 
-            model::Model,
-            camera::{Camera, CameraType},
-        },
-        context::*,
-    },
-    extension::RenderGuiExtension,
+        glm, transform::Transform
+    }, ecs::{CommandBuffer, Write}, egui, extension::RenderGuiExtension, render::{
+        context::*, pbr::{
+            camera::{Camera, CameraType}, material::DefaultMaterial, model::Model, texture::Texture
+        }
+    }, Flatbox
 };
+use flatbox_assets::resources::Resources;
+use flatbox_ecs::{event::{AppExit, Events}, Read};
+use flatbox_egui::{backend::EguiBackend, command::DrawEguiCommand};
+use flatbox_render::renderer::Renderer;
 
 fn main() {
     Flatbox::init(WindowBuilder {
@@ -26,9 +23,40 @@ fn main() {
         ..Default::default()
     })
         .add_default_extensions() 
-        .add_extension(RenderGuiExtension)   
+        .add_extension(RenderGuiExtension) 
         .add_setup_system(setup)
+        .add_render_system(render)
         .run();
+}
+
+fn render(
+    display: Read<Display>,
+    control_flow: Read<ControlFlow>,
+    events: Read<Events>,
+    resources: Read<Resources>,
+    mut renderer: Write<Renderer>,
+){
+    let mut egui_backend = resources.get_resource_mut::<EguiBackend>().unwrap();
+
+    let repaint_after = egui_backend.run((*display).clone(), |egui_ctx|{
+        egui::SidePanel::left("my_side_panel").show(egui_ctx, |ui| {
+            ui.heading("Hello World!");
+            if ui.button("Quit").clicked() {
+                events.get_handler_mut::<AppExit>().unwrap().send(AppExit);
+            }
+        });
+    });
+
+    if events.get_handler::<AppExit>().unwrap().read().is_some() {
+        control_flow.exit();
+    } else if repaint_after.is_zero() {
+        display.lock().window().request_redraw();
+        control_flow.set_poll();
+    } else if let Some(repaint_after_instant) = Instant::now().checked_add(repaint_after) {
+        control_flow.set_wait_until(repaint_after_instant);
+    }
+
+    renderer.execute(&mut DrawEguiCommand::new(&mut egui_backend)).unwrap();
 }
 
 fn setup(mut cmd: Write<CommandBuffer>) -> Result<()> {
