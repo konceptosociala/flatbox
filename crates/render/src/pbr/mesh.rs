@@ -160,6 +160,34 @@ impl Mesh {
             &[],
         )
     }
+
+    pub fn plane() -> Mesh {
+        Mesh::new(
+            &[
+                Vertex { position: glm::vec3(-0.5,0.5,-0.5), normal: glm::vec3(0.0, 0.0, -1.0), texcoord: glm::vec2(0.0, 0.0) },
+                Vertex { position: glm::vec3(-0.5,-0.5,-0.5), normal: glm::vec3(0.0, 0.0, -1.0), texcoord: glm::vec2(0.0, 1.0) },
+                Vertex { position: glm::vec3(0.5,-0.5,-0.5), normal: glm::vec3(0.0, 0.0, -1.0), texcoord: glm::vec2(1.0, 1.0) },
+                Vertex { position: glm::vec3(0.5,0.5,-0.5), normal: glm::vec3(0.0, 0.0, -1.0), texcoord: glm::vec2(1.0, 0.0) },
+
+                Vertex { position: glm::vec3(-0.5,0.5,0.5), normal: glm::vec3(0.0, 0.0, 1.0), texcoord: glm::vec2(0.0, 0.0) },
+                Vertex { position: glm::vec3(-0.5,-0.5,0.5), normal: glm::vec3(0.0, 0.0, 1.0), texcoord: glm::vec2(0.0, 1.0) },
+                Vertex { position: glm::vec3(0.5,-0.5,0.5), normal: glm::vec3(0.0, 0.0, 1.0), texcoord: glm::vec2(1.0, 1.0) },
+                Vertex { position: glm::vec3(0.5,0.5,0.5), normal: glm::vec3(0.0, 0.0, 1.0), texcoord: glm::vec2(1.0, 0.0) },
+
+                Vertex { position: glm::vec3(0.5,0.5,-0.5), normal: glm::vec3(1.0, 0.0, 0.0), texcoord: glm::vec2(0.0, 0.0) },
+                Vertex { position: glm::vec3(0.5,-0.5,-0.5), normal: glm::vec3(1.0, 0.0, 0.0), texcoord: glm::vec2(0.0, 1.0) },
+                Vertex { position: glm::vec3(0.5,-0.5,0.5), normal: glm::vec3(1.0, 0.0, 0.0), texcoord: glm::vec2(1.0, 1.0) },
+                Vertex { position: glm::vec3(0.5,0.5,0.5), normal: glm::vec3(1.0, 0.0, 0.0), texcoord: glm::vec2(1.0, 0.0) },
+
+                Vertex { position: glm::vec3(-0.5,0.5,-0.5), normal: glm::vec3(-1.0, 0.0, 0.0), texcoord: glm::vec2(0.0, 0.0) },
+                Vertex { position: glm::vec3(-0.5,-0.5,-0.5), normal: glm::vec3(-1.0, 0.0, 0.0), texcoord: glm::vec2(0.0, 1.0) },
+                Vertex { position: glm::vec3(-0.5,-0.5,0.5), normal: glm::vec3(-1.0, 0.0, 0.0), texcoord: glm::vec2(1.0, 1.0) },
+                Vertex { position: glm::vec3(-0.5,0.5,0.5), normal: glm::vec3(-1.0, 0.0, 0.0), texcoord: glm::vec2(1.0, 0.0) },
+            ],
+            &[0,1,3, 3,1,2],
+            &[],
+        )
+    }
     
     pub fn setup(&mut self, pipeline: &GraphicsPipeline) {
         if self.vertex_buffer.is_some() && self.index_buffer.is_some() {

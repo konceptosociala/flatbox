@@ -11,7 +11,7 @@ use flatbox::{
     }, Flatbox
 };
 use flatbox_assets::resources::Resources;
-use flatbox_ecs::{event::{AppExit, Events}, Read};
+use flatbox_ecs::{event::{AppExit, Events}, Read, SubWorld};
 use flatbox_egui::{backend::EguiBackend, command::DrawEguiCommand};
 use flatbox_render::renderer::Renderer;
 
@@ -26,6 +26,7 @@ fn main() {
         .add_extension(RenderGuiExtension) 
         .add_setup_system(setup)
         .add_render_system(render)
+        .add_system(update)
         .run();
 }
 
@@ -118,4 +119,18 @@ fn setup(mut cmd: Write<CommandBuffer>) -> Result<()> {
     ));
 
     Ok(())
+}
+
+fn update(events: Read<Events>, cam_world: SubWorld<(&Camera, &mut Transform)>){
+    if let Some(WindowEvent::KeyboardInput { input, .. }) = events.get_handler::<WindowEvent>().unwrap().read() {
+        for (_, (_, mut t)) in &mut cam_world.query::<(&Camera, &mut Transform)>() {
+            match input.virtual_keycode {
+                Some(VirtualKeyCode::W) => t.translation.z -= 1.0,
+                Some(VirtualKeyCode::S) => t.translation.z += 1.0,
+                Some(VirtualKeyCode::A) => t.translation.x -= 1.0,
+                Some(VirtualKeyCode::D) => t.translation.x += 1.0,
+                _ => {},
+            }
+        }
+    }
 }

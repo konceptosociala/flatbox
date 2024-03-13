@@ -8,3 +8,4 @@ pub mod renderer;
 pub mod palette {
     pub use palette::*;
 }
+pub mod prelude;

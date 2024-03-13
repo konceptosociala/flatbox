@@ -48,8 +48,15 @@ impl<E: Event> Default for EventHandler<E> {
     }
 }
 
-pub trait GenericEventHandler: AsAny + Send + Sync + 'static {}
-impl<E: Event> GenericEventHandler for EventHandler<E> {} 
+pub trait GenericEventHandler: AsAny + Send + Sync + 'static {
+    fn clear(&mut self);
+}
+
+impl<E: Event> GenericEventHandler for EventHandler<E> {
+    fn clear(&mut self) {
+        self.clear();
+    }
+} 
 
 #[derive(Default)]
 pub struct Events {
@@ -103,6 +110,12 @@ impl Events {
             e.insert(Arc::new(RwLock::new(handler)));
         } else {
             error!("Event handler '{}' is already pushed!", pretty_type_name::<H>());
+        }
+    }
+
+    pub fn clear(&mut self) {
+        for handler in self.storage.values() {
+            handler.write().clear();
         }
     }
 }

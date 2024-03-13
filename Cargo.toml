@@ -26,11 +26,13 @@ flatbox_ecs = { path = "crates/ecs", version = "0.1.0" }
 flatbox_egui = { path = "crates/egui", version = "0.1.0", optional = true  }
 flatbox_macros = { path = "crates/macros", version = "0.1.0" }
 flatbox_render = { path = "crates/render", version = "0.1.0", optional = true }
+flatbox_physics = { path = "crates/physics", version = "0.1.0", optional = true }
 flatbox_systems = { path = "crates/systems", version = "0.1.0" }
 
 [features]
-default = ["egui", "render"]
+default = ["egui", "render", "physics"]
 render = ["dep:flatbox_render"]
+physics = ["dep:flatbox_physics"]
 egui = ["dep:flatbox_egui"]
 
 [dev-dependencies]

@@ -77,9 +77,25 @@ impl Default for TextureDescriptor {
 }
 
 // FIXME: texture serde, clone, debug
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct Texture {
     id: GLuint,
+}
+
+impl Serialize for Texture {
+    fn serialize<S>(&self, _serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer {
+        unimplemented!("serialize texture");
+    }
+}
+
+impl<'de> Deserialize<'de> for Texture {
+    fn deserialize<D>(_deserializer: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de> {
+        unimplemented!("serialize texture");
+    }
 }
 
 #[typetag::serde]

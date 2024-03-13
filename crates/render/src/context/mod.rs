@@ -12,6 +12,7 @@ use parking_lot::{Mutex, MutexGuard};
 use crate::renderer::WindowExtent;
 
 pub use glutin::event::WindowEvent;
+pub use glutin::event::VirtualKeyCode;
 
 pub type GlContext = ContextWrapper<PossiblyCurrent, Window>;
 

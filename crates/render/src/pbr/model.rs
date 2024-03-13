@@ -1,4 +1,3 @@
-use flatbox_assets::{impl_ser_component, typetag};
 use flatbox_core::math::transform::Transform;
 use serde::{
     Serialize, 
@@ -37,6 +36,13 @@ impl Model {
         Model {
             mesh_type: MeshType::Cube,
             mesh: Some(Mesh::cube()),
+        }
+    }
+
+    pub fn plane() -> Model {
+        Model {
+            mesh_type: MeshType::Plane,
+            mesh: Some(Mesh::plane()),
         }
     }
 }
@@ -175,7 +181,6 @@ impl<'de> Deserialize<'de> for Model {
     }
 }
 
-impl_ser_component!(Model);
 
 pub struct ModelBundle<M: Material> {
     pub model: Model,

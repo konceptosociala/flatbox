@@ -35,6 +35,10 @@ pub mod macros {
     // pub use flatbox_macros::*;
 }
 
+pub mod physics {
+    // pub use flatbox_physics::*;
+}
+
 pub mod render {
     pub use flatbox_render::*;
 }
@@ -163,6 +167,7 @@ impl Flatbox {
         let mut update_schedule = self.schedules.get_mut("update").unwrap().build();
 
         self.events.push_handler(EventHandler::<AppExit>::new());
+        self.events.push_handler(EventHandler::<WindowEvent>::new());
 
         setup_schedule.execute_seq((
             &mut self.events,
@@ -185,6 +190,8 @@ impl Flatbox {
                         &mut self.renderer,
                         &mut self.assets,
                     )).expect("Cannot execute update systems");
+
+                    self.events.clear();
                 },
                 ContextEvent::RenderEvent(mut display, mut control_flow) => {                  
                     render_schedule.execute_seq((
@@ -198,6 +205,8 @@ impl Flatbox {
                     )).expect("Cannot execute render systems");
                 },
                 ContextEvent::WindowEvent(display, event) => {
+                    self.events.get_handler_mut::<WindowEvent>().unwrap().send(event.clone());
+
                     if on_window_event(&mut self.resources, event) {
                         display.lock().window().request_redraw();
                     }
