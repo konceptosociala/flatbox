@@ -2,6 +2,13 @@
 name = "flatbox_systems"
 version = "0.1.0"
 edition = "2021"
+categories = ["game-engines", "rendering"]
+description = "ECS systems for Flatbox engine"
+homepage = "https://konceptosociala.eu.org/flatbox"
+keywords = ["flatbox"]
+license = "Unlicense"
+readme = "README.md"
+repository = "https://github.com/konceptosociala/flatbox"
 
 [dependencies]
 anyhow = "1.0.75"

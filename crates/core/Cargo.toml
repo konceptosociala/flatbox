@@ -1,7 +1,14 @@
-[package]
+[package]   
 name = "flatbox_core"
 version = "0.1.0"
 edition = "2021"
+categories = ["game-engines", "rendering"]
+description = "Provides core functionality for Flatbox engine"
+homepage = "https://konceptosociala.eu.org/flatbox"
+keywords = ["flatbox"]
+license = "Unlicense"
+readme = "README.md"
+repository = "https://github.com/konceptosociala/flatbox"
 
 [dependencies]
 colored = "2.0.4"

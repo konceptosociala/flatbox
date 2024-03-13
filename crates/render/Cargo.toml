@@ -2,6 +2,13 @@
 name = "flatbox_render"
 version = "0.1.0"
 edition = "2021"
+categories = ["game-engines", "rendering"]
+description = "Provides rendering functionality for Flatbox engine"
+homepage = "https://konceptosociala.eu.org/flatbox"
+keywords = ["flatbox"]
+license = "Unlicense"
+readme = "README.md"
+repository = "https://github.com/konceptosociala/flatbox"
 
 [dependencies]
 flatbox_assets = { version = "0.1.0", path = "../assets" }
