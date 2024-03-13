@@ -2,6 +2,12 @@
 name = "flatbox_assets"
 version = "0.1.0"
 edition = "2021"
+categories = ["game-engines", "rendering"]
+description = "Provides assets management functionality for Flatbox engine"
+homepage = "https://konceptosociala.eu.org/flatbox"
+keywords = ["flatbox"]
+license = "Unlicense"
+repository = "https://github.com/konceptosociala/flatbox"
 
 [dependencies]
 as-any = "0.3.1"
