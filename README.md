@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://konceptosociala.eu.org/software/flatbox">
-    <img src="https://konceptosociala.eu.org/img/projects/flatbox.jpg"width="1200" alt="Flatbox banner">
+    <img src="https://konceptosociala.eu.org/img/flatbox.jpg"width="1200" alt="Flatbox banner">
   </a>
 </p>    
 
