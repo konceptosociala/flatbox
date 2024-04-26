@@ -36,7 +36,7 @@ impl EguiBackend {
         }
     }
 
-    pub fn context(&self) -> &egui::Context {
+    pub fn context(&mut self) -> &egui::Context {
         &self.egui_ctx
     }
 

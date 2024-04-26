@@ -1,6 +1,6 @@
 [package]
 name = "flatbox_assets"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 categories = ["game-engines", "rendering"]
 description = "Provides assets management functionality for Flatbox engine"
@@ -11,8 +11,8 @@ repository = "https://github.com/konceptosociala/flatbox"
 
 [dependencies]
 as-any = "0.3.1"
-flatbox_ecs = { version = "0.1.0", path = "../ecs", optional = true }
-flatbox_core = { version = "0.1.0", path = "../core" }
+flatbox_ecs = { version = "0.2.0", path = "../ecs", optional = true }
+flatbox_core = { version = "0.2.0", path = "../core" }
 lz4 = "1.24.0"
 parking_lot = { version = "0.12.0", features = ["serde"] }
 pretty-type-name = "1.0.1"

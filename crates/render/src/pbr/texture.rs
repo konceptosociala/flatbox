@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use flatbox_assets::{
-    manager::Asset,
+    // manager::Asset,
     typetag,
 };
 use gl::types::GLuint;
@@ -76,7 +76,6 @@ impl Default for TextureDescriptor {
     }
 }
 
-// FIXME: texture serde, clone, debug
 #[derive(Clone, Debug)]
 pub struct Texture {
     id: GLuint,
@@ -98,8 +97,8 @@ impl<'de> Deserialize<'de> for Texture {
     }
 }
 
-#[typetag::serde]
-impl Asset for Texture {}
+// #[typetag::serde]
+// impl Asset for Texture {}
 
 impl Texture {
     pub fn new<P: AsRef<Path>>(path: P, descr: Option<TextureDescriptor>) -> Result<Texture, RenderError> {

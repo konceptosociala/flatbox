@@ -9,7 +9,6 @@ use flatbox_ecs::{World, EntityBuilder};
 use crate::error::RonError;
 use crate::{
     error::AssetError,
-    manager::AssetManager,
     ser_component::SerializableComponent,
 };
 
@@ -25,7 +24,6 @@ pub struct SerializableEntity {
 /// # Usage example
 /// ```rust
 /// let entity = entity![
-///     AssetHandle::null(), 
 ///     Model::cube(),
 ///     Transform::default()
 /// ];
@@ -48,7 +46,6 @@ macro_rules! entity {
 
 #[derive(Default, Serialize, Deserialize)]
 pub struct Scene {
-    pub assets: AssetManager,
     pub entities: Vec<SerializableEntity>,
 }
 
@@ -90,7 +87,6 @@ impl Scene {
 /// # Usage example
 /// ```rust
 /// let scene = scene! {
-///     assets: AssetManager::new(),
 ///     entities: [
 ///         entity![
 ///             Camera::builder()
@@ -110,7 +106,6 @@ impl Scene {
 #[macro_export]
 macro_rules! scene {
     {
-        assets: $assets:expr,
         entities: [$( $entity:expr ),+]
     } => {
         {
@@ -120,7 +115,6 @@ macro_rules! scene {
             )+
 
             Scene {
-                assets: $assets,
                 entities,
             }
         }

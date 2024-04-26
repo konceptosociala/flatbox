@@ -1,9 +1,7 @@
 use slotmap::new_key_type;
 
 pub mod error;
-pub mod manager;
 pub mod prelude;
-pub mod resources;
 pub mod save_load;
 pub mod scene;
 pub mod ser_component;

@@ -1,13 +1,14 @@
+use std::time::{Duration, Instant};
+
 use anyhow::Result;
-use flatbox_core::math::transform::Transform;
-use flatbox_ecs::{SubWorld, Write};
+// use flatbox_assets::resources::Resources;
+use flatbox_core::{math::transform::Transform, AppExit};
+use flatbox_ecs::*;
+use flatbox_egui::{backend::EguiBackend, command::DrawEguiCommand};
 use flatbox_render::{
-    pbr::{
-        material::Material, 
-        model::Model, camera::Camera,
-    }, 
-    renderer::{Renderer, PrepareModelCommand, DrawModelCommand, ClearCommand, RenderCameraCommand}, 
-    error::RenderError,
+    context::{ControlFlow, Display}, error::RenderError, pbr::{
+        camera::Camera, material::Material, model::Model
+    }, renderer::{ClearCommand, DrawModelCommand, PrepareModelCommand, RenderCameraCommand, Renderer}
 };
 
 pub fn clear_screen(mut renderer: Write<Renderer>) -> Result<()> {
@@ -44,4 +45,47 @@ pub fn render_material<M: Material>(
     }
 
     Ok(())
+}
+
+pub fn run_egui_backend(
+    egui_world: SubWorld<&mut EguiBackend>,
+    display: Read<Display>,
+    mut control_flow: Write<ControlFlow>,
+){
+    control_flow.set_repaint_after(
+        egui_world
+            .query::<&mut EguiBackend>()
+            .iter()
+            .map(|(_,b)| {b})
+            .next()
+            .unwrap()
+            .run((*display).clone(), |_|{})
+    );
+}
+
+pub fn draw_ui(
+    app_exit: SubWorld<&AppExit>,
+    egui_world: SubWorld<&mut EguiBackend>,
+    display: Read<Display>,
+    mut control_flow: Write<ControlFlow>,
+    mut renderer: Write<Renderer>,
+){
+    let mut egui_backend_query = egui_world.query::<&mut EguiBackend>();
+    let mut egui_backend = egui_backend_query
+        .iter()
+        .map(|(_,b)| {b})
+        .next()
+        .unwrap();
+
+    if app_exit.query::<&AppExit>().iter().len() > 0 {
+        control_flow.exit();
+    } else if control_flow.repaint_after().is_zero() {
+        display.lock().window().request_redraw();
+        control_flow.set_poll();
+    } else if let Some(repaint_after_instant) = Instant::now().checked_add(control_flow.repaint_after()) {
+        control_flow.set_wait_until(repaint_after_instant);
+        control_flow.set_repaint_after(Duration::ZERO);
+    }
+
+    renderer.execute(&mut DrawEguiCommand::new(&mut egui_backend)).unwrap();    
 }

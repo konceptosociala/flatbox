@@ -1,6 +1,6 @@
 [package]
 name = "flatbox_render"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 categories = ["game-engines", "rendering"]
 description = "Provides rendering functionality for Flatbox engine"
@@ -10,9 +10,9 @@ license = "Unlicense"
 repository = "https://github.com/konceptosociala/flatbox"
 
 [dependencies]
-flatbox_assets = { version = "0.1.0", path = "../assets" }
-flatbox_core = { version = "0.1.0", path = "../core" }
-flatbox_ecs = { version = "0.1.0", path = "../ecs", optional = true }
+flatbox_assets = { version = "0.2.0", path = "../assets" }
+flatbox_core = { version = "0.2.0", path = "../core" }
+flatbox_ecs = { version = "0.2.0", path = "../ecs", optional = true }
 
 anyhow = "1.0.75"
 bytemuck = "1.7.2"

@@ -13,6 +13,7 @@ use crate::renderer::WindowExtent;
 
 pub use glutin::event::WindowEvent;
 pub use glutin::event::VirtualKeyCode;
+pub use glutin::event::ElementState;
 
 pub type GlContext = ContextWrapper<PossiblyCurrent, Window>;
 
@@ -46,33 +47,44 @@ impl From<PhysicalSize<u32>> for WindowExtent {
 }
 
 #[derive(Default, Clone)]
-pub struct ControlFlow(Arc<Mutex<WinitControlFlow>>);
+pub struct ControlFlow {
+    inner: Arc<Mutex<WinitControlFlow>>,
+    repaint_after: Duration,
+}  
 
 impl ControlFlow {
     pub fn new() -> ControlFlow {
         ControlFlow::default()
     }
 
+    pub fn repaint_after(&self) -> Duration {
+        self.repaint_after
+    }
+
+    pub fn set_repaint_after(&mut self, repaint_after: Duration) {
+        self.repaint_after = repaint_after;
+    }
+
     pub fn set_poll(&self) {
-        *(self.0.lock()) = WinitControlFlow::Poll;
+        *(self.inner.lock()) = WinitControlFlow::Poll;
     }
 
     pub fn set_wait(&self) {
-        *(self.0.lock()) = WinitControlFlow::Wait;
+        *(self.inner.lock()) = WinitControlFlow::Wait;
     }
 
     pub fn set_wait_until(&self, instant: Instant) {
-        *(self.0.lock()) = WinitControlFlow::WaitUntil(instant);
+        *(self.inner.lock()) = WinitControlFlow::WaitUntil(instant);
     }
 
     pub fn exit(&self) {
-        *(self.0.lock()) = WinitControlFlow::Exit;
+        *(self.inner.lock()) = WinitControlFlow::Exit;
     }
 }
 
 impl Debug for ControlFlow {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
+        self.inner.fmt(f)
     }
 }
 
@@ -252,7 +264,7 @@ impl Context {
                 Event::RedrawRequested(_) => {
                     self.next_frame(&mut runner);
                     
-                    *control_flow = *(self.control_flow.0.lock());
+                    *control_flow = *(self.control_flow.inner.lock());
                     self.display.lock().swap_buffers().unwrap();
                 },
                 Event::MainEventsCleared => {

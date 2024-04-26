@@ -1,19 +1,18 @@
 use flatbox_ecs::World;
 
-use crate::{manager::AssetManager, error::AssetError};
+use crate::prelude::AssetError;
 
 pub trait SaveLoad {
     fn save<P: AsRef<std::path::Path>>(
         &mut self,
         world: &World,
-        asset_manager: &AssetManager,
         path: P,
     ) -> Result<(), AssetError>;
     
     fn load<P: AsRef<std::path::Path>>(
         &mut self,
         path: P,
-    ) -> Result<(World, AssetManager), AssetError>;
+    ) -> Result<World, AssetError>;
 }
 
 /// Macro that is used to create custom [`SaveLoad`]ers, 
@@ -171,11 +170,6 @@ macro_rules! impl_save_load {
                 let assets_bytes = assets.as_bytes();
                 let assets_header = create_header("assets.ron", assets_bytes.len());
                 archive.append(&assets_header, assets_bytes)?;
-
-                // let physics = ron::ser::to_string_pretty(&physics_handler, PrettyConfig::default())?;
-                // let physics_bytes = physics.as_bytes();
-                // let physics_header = create_header("physics.ron", physics_bytes.len());
-                // archive.append(&physics_header, physics_bytes)?;
 
                 let inner = archive.into_inner()?;
                 let mut cursor = Cursor::new(inner);

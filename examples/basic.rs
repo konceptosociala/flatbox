@@ -1,19 +1,20 @@
-use std::time::Instant;
-
 use anyhow::Result;
 use flatbox::{
     core::math::{
         glm, transform::Transform
-    }, ecs::{CommandBuffer, Write}, egui, extension::RenderGuiExtension, render::{
+    }, 
+    ecs::{CommandBuffer, Write}, 
+    egui, 
+    render::{
         context::*, pbr::{
             camera::{Camera, CameraType}, material::DefaultMaterial, model::Model, texture::Texture
         }
-    }, Flatbox
+    }, 
+    Flatbox
 };
-use flatbox_assets::resources::Resources;
-use flatbox_ecs::{event::{AppExit, Events}, Read, SubWorld};
-use flatbox_egui::{backend::EguiBackend, command::DrawEguiCommand};
-use flatbox_render::renderer::Renderer;
+use flatbox_core::AppExit;
+use flatbox_ecs::{query::Mut, SubWorld, SystemStage::*};
+use flatbox_egui::backend::EguiBackend;
 
 fn main() {
     Flatbox::init(WindowBuilder {
@@ -22,42 +23,10 @@ fn main() {
         height: 600,
         ..Default::default()
     })
-        .add_default_extensions() 
-        .add_extension(RenderGuiExtension) 
-        .add_setup_system(setup)
-        .add_render_system(render)
-        .add_system(update)
+        .default_extensions() 
+        .add_system(Setup, setup)
+        .add_system(Render, set_ui)
         .run();
-}
-
-fn render(
-    display: Read<Display>,
-    control_flow: Read<ControlFlow>,
-    events: Read<Events>,
-    resources: Read<Resources>,
-    mut renderer: Write<Renderer>,
-){
-    let mut egui_backend = resources.get_resource_mut::<EguiBackend>().unwrap();
-
-    let repaint_after = egui_backend.run((*display).clone(), |egui_ctx|{
-        egui::SidePanel::left("my_side_panel").show(egui_ctx, |ui| {
-            ui.heading("Hello World!");
-            if ui.button("Quit").clicked() {
-                events.get_handler_mut::<AppExit>().unwrap().send(AppExit);
-            }
-        });
-    });
-
-    if events.get_handler::<AppExit>().unwrap().read().is_some() {
-        control_flow.exit();
-    } else if repaint_after.is_zero() {
-        display.lock().window().request_redraw();
-        control_flow.set_poll();
-    } else if let Some(repaint_after_instant) = Instant::now().checked_add(repaint_after) {
-        control_flow.set_wait_until(repaint_after_instant);
-    }
-
-    renderer.execute(&mut DrawEguiCommand::new(&mut egui_backend)).unwrap();
 }
 
 fn setup(mut cmd: Write<CommandBuffer>) -> Result<()> {
@@ -121,16 +90,40 @@ fn setup(mut cmd: Write<CommandBuffer>) -> Result<()> {
     Ok(())
 }
 
-fn update(events: Read<Events>, cam_world: SubWorld<(&Camera, &mut Transform)>){
-    if let Some(WindowEvent::KeyboardInput { input, .. }) = events.get_handler::<WindowEvent>().unwrap().read() {
-        for (_, (_, mut t)) in &mut cam_world.query::<(&Camera, &mut Transform)>() {
-            match input.virtual_keycode {
-                Some(VirtualKeyCode::W) => t.translation.z -= 1.0,
-                Some(VirtualKeyCode::S) => t.translation.z += 1.0,
-                Some(VirtualKeyCode::A) => t.translation.x -= 1.0,
-                Some(VirtualKeyCode::D) => t.translation.x += 1.0,
-                _ => {},
-            }
+fn set_ui(
+    mut cmd: Write<CommandBuffer>,
+    egui_world: SubWorld<&mut EguiBackend>,
+    cam_world: SubWorld<(&Camera, &mut Transform)>,
+){
+    let mut egui_backend_query = egui_world.query::<&mut EguiBackend>();
+    let mut egui_backend = egui_backend_query
+        .iter()
+        .map(|(_,b)| {b})
+        .next()
+        .unwrap();
+
+    let ctx = egui_backend.context();
+
+    egui::SidePanel::left("m").show(ctx, |ui| {
+        if ui.button("exit").clicked() {
+            cmd.spawn((AppExit,));
         }
+    });
+
+    let mut trans = <TransformFunction>::None;
+
+    if ctx.input().key_down(egui::Key::W) {
+        trans = Some(Box::new(|mut t: Mut<'_, Transform>| { t.translation.x += 1.0; println!("w pressed"); }));
     }
+
+    if ctx.input().key_down(egui::Key::S) {
+        trans = Some(Box::new(|mut t: Mut<'_, Transform>| { t.translation.x -= 1.0; println!("s pressed"); }));
+    }
+
+    cam_world.query::<(&Camera, &mut Transform)>()
+        .into_iter()
+        .map(|(_, (_, t))| t)
+        .for_each(trans.unwrap_or(Box::new(|_|{})));  
 }
+
+type TransformFunction = Option<Box<dyn FnMut(Mut<'_, Transform>)>>;
