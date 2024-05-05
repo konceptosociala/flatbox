@@ -260,9 +260,9 @@ impl Painter {
                 );
 
                 Texture::new_from_raw(
-                    data, 
                     image.width() as u32, 
                     image.height() as u32, 
+                    data,
                     Some(TextureDescriptor {
                         filter: delta.filter.to_native(),
                         wrap_mode: WrapMode::ClampToEdge,
@@ -299,9 +299,9 @@ impl Painter {
                 );
 
                 Texture::new_from_raw(
-                    &data, 
                     image.width() as u32, 
                     image.height() as u32, 
+                    &data,
                     Some(TextureDescriptor {
                         filter: delta.filter.to_native(),
                         wrap_mode: WrapMode::ClampToEdge,

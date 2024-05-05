@@ -12,8 +12,7 @@ use flatbox::{
     }, 
     Flatbox
 };
-use flatbox_core::AppExit;
-use flatbox_ecs::{query::Mut, SubWorld, SystemStage::*};
+use flatbox_ecs::{query::Mut, Read, SubWorld, SystemStage::*};
 use flatbox_egui::backend::EguiBackend;
 
 fn main() {
@@ -91,39 +90,42 @@ fn setup(mut cmd: Write<CommandBuffer>) -> Result<()> {
 }
 
 fn set_ui(
-    mut cmd: Write<CommandBuffer>,
+    mut control_flow: Write<ControlFlow>,
+    display: Read<Display>,
     egui_world: SubWorld<&mut EguiBackend>,
     cam_world: SubWorld<(&Camera, &mut Transform)>,
 ){
-    let mut egui_backend_query = egui_world.query::<&mut EguiBackend>();
-    let mut egui_backend = egui_backend_query
-        .iter()
-        .map(|(_,b)| {b})
-        .next()
-        .unwrap();
+    control_flow.set_repaint_after(
+        egui_world
+            .query::<&mut EguiBackend>()
+            .iter()
+            .map(|(_,b)| {b})
+            .next()
+            .unwrap()
+            .run(&display, |ctx|{
+                egui::Window::new("Ĉapitrelekta dialogo")
+                    .collapsible(false)
+                    .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+                    .show(ctx, |ui| {
+                        ui.label("Hello World!");
+                    });
 
-    let ctx = egui_backend.context();
+                let mut trans = <TransformFunction>::None;
 
-    egui::SidePanel::left("m").show(ctx, |ui| {
-        if ui.button("exit").clicked() {
-            cmd.spawn((AppExit,));
-        }
-    });
-
-    let mut trans = <TransformFunction>::None;
-
-    if ctx.input().key_down(egui::Key::W) {
-        trans = Some(Box::new(|mut t: Mut<'_, Transform>| { t.translation.x += 1.0; println!("w pressed"); }));
-    }
-
-    if ctx.input().key_down(egui::Key::S) {
-        trans = Some(Box::new(|mut t: Mut<'_, Transform>| { t.translation.x -= 1.0; println!("s pressed"); }));
-    }
-
-    cam_world.query::<(&Camera, &mut Transform)>()
-        .into_iter()
-        .map(|(_, (_, t))| t)
-        .for_each(trans.unwrap_or(Box::new(|_|{})));  
+                if ctx.input().key_down(egui::Key::W) {
+                    trans = Some(Box::new(|mut t: Mut<'_, Transform>| { t.translation.x += 1.0; println!("w pressed"); }));
+                }
+            
+                if ctx.input().key_down(egui::Key::S) {
+                    trans = Some(Box::new(|mut t: Mut<'_, Transform>| { t.translation.x -= 1.0; println!("s pressed"); }));
+                }
+            
+                cam_world.query::<(&Camera, &mut Transform)>()
+                    .into_iter()
+                    .map(|(_, (_, t))| t)
+                    .for_each(trans.unwrap_or(Box::new(|_|{})));  
+            })
+    );
 }
 
 type TransformFunction = Option<Box<dyn FnMut(Mut<'_, Transform>)>>;

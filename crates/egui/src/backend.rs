@@ -46,7 +46,7 @@ impl EguiBackend {
 
     pub fn run(
         &mut self,
-        display: Display,
+        display: &Display,
         run_ui: impl FnMut(&egui::Context),
     ) -> std::time::Duration {
         let raw_input = self.state.lock().take_egui_input(display.lock().window());

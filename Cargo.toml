@@ -37,6 +37,7 @@ egui = ["dep:flatbox_egui"]
 
 [dev-dependencies]
 anyhow = "1.0.75"
+ron = "0.8.1"
 
 [profile.dev]
 opt-level = 1

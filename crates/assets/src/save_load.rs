@@ -17,8 +17,7 @@ pub trait SaveLoad {
 
 /// Macro that is used to create custom [`SaveLoad`]ers, 
 /// that are capable of saving and loading individual serializable
-/// components from the [`World`], scene's [`PhysicsHandler`] and 
-/// [`AssetManager`]
+/// components from the [`World`]
 /// 
 /// # Usage example
 /// 
@@ -37,7 +36,6 @@ pub trait SaveLoad {
 ///         Camera, 
 ///         Timer, 
 ///         Transform,
-///         AssetHandle<'M'>,
 ///         MyComponent
 ///     ]
 /// }
@@ -57,8 +55,8 @@ macro_rules! impl_save_load {
         loader: $ctx:ident, 
         components: [ $( $comp:ty ),+ ]
     } => {
-        impl ::flatbox_ecs::SerializeContext for $ctx {
-            fn component_count(&self, archetype: &::flatbox_ecs::Archetype) -> usize {                
+        impl SerializeContext for $ctx {
+            fn component_count(&self, archetype: &Archetype) -> usize {                
                 archetype.component_types()
                     .filter(|&t|
                         $(
@@ -71,11 +69,11 @@ macro_rules! impl_save_load {
             
             fn serialize_component_ids<S: serde::ser::SerializeTuple>(
                 &mut self,
-                archetype: &::flatbox_ecs::Archetype,
+                archetype: &Archetype,
                 mut out: S,
             ) -> Result<S::Ok, S::Error> {
                 $(
-                    ::flatbox_ecs::try_serialize_id::<$comp, _, _>(archetype, stringify!($comp), &mut out)?;
+                    try_serialize_id::<$comp, _, _>(archetype, stringify!($comp), &mut out)?;
                 )*
                 
                 out.end()
@@ -83,24 +81,24 @@ macro_rules! impl_save_load {
             
             fn serialize_components<S: serde::ser::SerializeTuple>(
                 &mut self,
-                archetype: &::flatbox_ecs::Archetype,
+                archetype: &Archetype,
                 mut out: S,
             ) -> Result<S::Ok, S::Error> {
                 $(
-                    ::flatbox_ecs::try_serialize::<$comp, _>(archetype, &mut out)?;
+                    try_serialize::<$comp, _>(archetype, &mut out)?;
                 )*
                 
                 out.end()
             }
         }
         
-        impl ::flatbox_ecs::DeserializeContext for $ctx {
+        impl DeserializeContext for $ctx {
             fn deserialize_component_ids<'de, A: serde::de::SeqAccess<'de>>(
                 &mut self,
                 mut seq: A,
-            ) -> Result<::flatbox_ecs::ColumnBatchType, A::Error> {
+            ) -> Result<ColumnBatchType, A::Error> {
                 self.components.clear();
-                let mut batch = ::flatbox_ecs::ColumnBatchType::new();
+                let mut batch = ColumnBatchType::new();
                 while let Some(id) = seq.next_element::<String>()? {
                     match id.as_str() {                        
                         $(                            
@@ -121,13 +119,13 @@ macro_rules! impl_save_load {
                 &mut self,
                 entity_count: u32,
                 mut seq: A,
-                batch: &mut ::flatbox_ecs::ColumnBatchBuilder,
+                batch: &mut ColumnBatchBuilder,
             ) -> Result<(), A::Error> {
                 for component in &self.components {
                     match component.as_str() {
                         $(                            
                             stringify!($comp) => {
-                                ::flatbox_ecs::deserialize_column::<$comp, _>(entity_count, &mut seq, batch)?;
+                                deserialize_column::<$comp, _>(entity_count, &mut seq, batch)?;
                             }
                         )*
                         
@@ -143,110 +141,51 @@ macro_rules! impl_save_load {
         impl SaveLoad for $ctx {
             fn save<P: AsRef<std::path::Path>>(
                 &mut self,
-                world: &::flatbox_ecs::World,
-                asset_manager: &$crate::manager::AssetManager,
+                world: &World,
                 path: P,
-            ) -> Result<(), $crate::error::AssetError> {
+            ) -> Result<(), AssetError> {
                 use std::fs::File;
                 use std::io::Cursor;
                 use ron::ser::PrettyConfig;
 
-                let mut buf = vec![];                    
-                let mut ser = ron::Serializer::new(&mut buf, Some(PrettyConfig::new()))
+                let mut world_buf = vec![];                    
+                let mut ser = ron::Serializer::new(&mut world_buf, Some(PrettyConfig::new()))
                     .map_err(|e| $crate::error::RonError::from(e))?;    
 
-                ::flatbox_ecs::serialize_world(&world, self, &mut ser)
+                serialize_world(&world, self, &mut ser)
                     .map_err(|e| $crate::error::RonError::from(e))?;
-
-                let mut a = vec![];
-                let mut archive = tar::Builder::new(&mut a);
-
-                let world = &*buf;
-                let world_header = create_header("world.ron", world.len());
-                archive.append(&world_header, world)?;
-
-                let assets = ron::ser::to_string_pretty(&asset_manager, PrettyConfig::default())
-                    .map_err(|e| $crate::error::RonError::from(e))?;
-                let assets_bytes = assets.as_bytes();
-                let assets_header = create_header("assets.ron", assets_bytes.len());
-                archive.append(&assets_header, assets_bytes)?;
-
-                let inner = archive.into_inner()?;
-                let mut cursor = Cursor::new(inner);
 
                 let file = File::create(path)?;
-                let mut encoder = lz4::EncoderBuilder::new()
+                let mut encoder = $crate::lz4::EncoderBuilder::new()
                     .level(4)
                     .build(file)?;  
 
-                std::io::copy(&mut cursor, &mut encoder)?; 
+                std::io::copy(&mut &*world_buf, &mut encoder)?; 
 
-                let (_, result) = encoder.finish();
-                
-                result?;
-
-                Ok(())
+                Ok(encoder.finish().1?)
             }
             
             fn load<P: AsRef<std::path::Path>>(
                 &mut self,
                 path: P,
-            ) -> Result<(::flatbox_ecs::World, $crate::manager::AssetManager), $crate::error::AssetError> {
+            ) -> Result<World, AssetError> {
                 use std::fs::File;
                 use std::io::Read;
-                use ::serde::Deserialize;
+                use serde::Deserialize;
 
                 let package = File::open(path)?;
-                let decoded = lz4::Decoder::new(package)?;
-                let mut archive = tar::Archive::new(decoded);
+                let mut decoded = $crate::lz4::Decoder::new(package)?;
+                let mut buffer = vec![];
+                decoded.read_to_end(&mut buffer)?;
 
-                let mut world = None;
-                let mut asset_manager = None;
-                // let mut physics_handler = None;
+                let mut de = ron::Deserializer::from_bytes(&buffer)
+                    .map_err(|e| $crate::error::RonError::from(e))?;
 
-                for file in archive.entries().unwrap() {
-                    let mut file = file.unwrap();
-                    let header = file.header().clone();
+                let world = deserialize_world(self, &mut de)
+                    .map_err(|e| $crate::error::RonError::from(e))?;
 
-                    let mut buffer = vec![];
-                    file.read_to_end(&mut buffer)?;
-                    let mut de = ron::Deserializer::from_bytes(&buffer)
-                        .map_err(|e| $crate::error::RonError::from(e))?;
-                    
-                    if header.entry_type() == tar::EntryType::Regular {
-                        match header.path().unwrap().to_str().unwrap() {
-                            "world.ron" => {
-                                world = Some(::flatbox_ecs::deserialize_world(self, &mut de)
-                                    .map_err(|e| $crate::error::RonError::from(e))?);
-                            },
-                            "assets.ron" => {
-                                asset_manager = Some($crate::manager::AssetManager::deserialize(&mut de)
-                                    .map_err(|e| $crate::error::RonError::from(e))?);
-                            },
-                            // "physics.ron" => {
-                            //     physics_handler = Some(PhysicsHandler::deserialize(&mut de)?);
-                            // },
-                            _ => {},
-                        }
-                    }
-                }
-                
-                Ok((
-                    world.unwrap(), 
-                    asset_manager.unwrap(), 
-                    // physics_handler.unwrap()
-                ))
+                Ok(world)
             }
-        }
-
-        fn create_header(path: &'static str, size: usize) -> tar::Header {
-            let mut header = tar::Header::new_gnu();
-            header.set_entry_type(tar::EntryType::Regular);
-            header.set_path(path).unwrap();
-            header.set_size(size as u64);
-            header.set_cksum();
-
-            header
         }
     };
 }

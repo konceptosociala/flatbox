@@ -1,5 +1,3 @@
-use slotmap::new_key_type;
-
 pub mod error;
 pub mod prelude;
 pub mod save_load;
@@ -11,7 +9,3 @@ pub use tar;
 pub use lz4;
 pub use typetag;
 pub use parking_lot;
-
-new_key_type! {
-    pub struct AssetHandle;
-}

@@ -83,6 +83,8 @@ pub enum MeshType {
     Generic,
 }
 
+// TODO: other model primitive types
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Mesh {
     pub vertex_data: Vec<Vertex>,

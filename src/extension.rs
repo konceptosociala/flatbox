@@ -2,14 +2,14 @@ use std::marker::PhantomData;
 use std::any::TypeId;
 use std::fmt::Debug;
 use flatbox_render::pbr::material::Material;
-use flatbox_systems::rendering::{bind_material, clear_screen, draw_ui, render_material, run_egui_backend};
+use flatbox_systems::rendering::{bind_material, clear_screen, draw_ui, render_material};
 
 #[cfg(feature = "egui")]
 use flatbox_egui::backend::EguiBackend;
 
 use crate::Flatbox;
 
-use flatbox_ecs::SystemStage::*;
+use flatbox_ecs::{single, SystemStage::*};
  
 pub trait Extension: Debug {
     fn apply(&self, app: &mut Flatbox);
@@ -63,14 +63,10 @@ pub struct RenderGuiExtension;
 impl Extension for RenderGuiExtension {
     fn apply(&self, app: &mut Flatbox) {
         app
-            .add_system(Render, run_egui_backend)
             .add_system(PostRender, draw_ui)
             .set_on_window_event(|world, event| {
-                world
-                    .query::<&mut EguiBackend>()
-                    .iter()
-                    .map(|(_, b)| {b})
-                    .next().unwrap().on_event(&event)
+                single!(world, egui_backend => &mut EguiBackend);
+                egui_backend.on_event(&event)
             });
     }
 }

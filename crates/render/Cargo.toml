@@ -17,8 +17,6 @@ flatbox_ecs = { version = "0.2.0", path = "../ecs", optional = true }
 anyhow = "1.0.75"
 bytemuck = "1.7.2"
 casey = "0.4.0"
-egui = { version = "0.19", features = ["bytemuck"] }
-egui-winit = { version = "0.19.0", default-features = false, features = ["clipboard", "links"] }
 gl = "0.14.0"
 glutin = { version = "0.29.1", optional = true, features = ["x11"] }
 image = "0.24.5"

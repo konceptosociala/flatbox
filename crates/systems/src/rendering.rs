@@ -1,7 +1,6 @@
 use std::time::{Duration, Instant};
 
 use anyhow::Result;
-// use flatbox_assets::resources::Resources;
 use flatbox_core::{math::transform::Transform, AppExit};
 use flatbox_ecs::*;
 use flatbox_egui::{backend::EguiBackend, command::DrawEguiCommand};
@@ -47,22 +46,6 @@ pub fn render_material<M: Material>(
     Ok(())
 }
 
-pub fn run_egui_backend(
-    egui_world: SubWorld<&mut EguiBackend>,
-    display: Read<Display>,
-    mut control_flow: Write<ControlFlow>,
-){
-    control_flow.set_repaint_after(
-        egui_world
-            .query::<&mut EguiBackend>()
-            .iter()
-            .map(|(_,b)| {b})
-            .next()
-            .unwrap()
-            .run((*display).clone(), |_|{})
-    );
-}
-
 pub fn draw_ui(
     app_exit: SubWorld<&AppExit>,
     egui_world: SubWorld<&mut EguiBackend>,
@@ -77,11 +60,14 @@ pub fn draw_ui(
         .next()
         .unwrap();
 
+    // If app exit
     if app_exit.query::<&AppExit>().iter().len() > 0 {
         control_flow.exit();
+    // If latency is zero, redraw
     } else if control_flow.repaint_after().is_zero() {
         display.lock().window().request_redraw();
         control_flow.set_poll();
+    // Wait until next repaint
     } else if let Some(repaint_after_instant) = Instant::now().checked_add(control_flow.repaint_after()) {
         control_flow.set_wait_until(repaint_after_instant);
         control_flow.set_repaint_after(Duration::ZERO);

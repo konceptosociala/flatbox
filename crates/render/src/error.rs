@@ -7,6 +7,8 @@ use crate::hal::shader::ShaderError;
 pub enum RenderError {
     #[error("Error processing image data")]
     ImageProcessing(#[from] ImageError),
+    #[error("Wrong image data passed")]
+    WrongImageData,
     #[error("Error processing shaders")]
     ShaderProcessing(#[from] ShaderError),
     #[error("Material not bound: {0}")]

@@ -98,6 +98,7 @@ impl Flatbox {
         if self.extensions.contains(&TypeId::of::<E>()) {
             panic!("Extension `{}` is already added!", pretty_type_name::<E>());
         } else {
+            self.extensions.push(TypeId::of::<E>());
             extension.apply(self);
         }
 
@@ -124,23 +125,24 @@ impl Flatbox {
         #[cfg(feature = "egui")]
         self.world.spawn((EguiBackend::new(&self.context),));
 
-        setup_schedule.execute_seq((
-            &mut self.world,
-            &mut self.renderer,
-        )).expect("Cannot execute setup systems");
-
         self.context.run(|event|{
             match event {
-                ContextEvent::ResizeEvent(extent) => {
-                    self.renderer.set_extent(extent);
-                },
-                ContextEvent::UpdateEvent => {
-                    update_schedule.execute((
+                ContextEvent::Setup(mut display) => {
+                    setup_schedule.execute_seq((
+                        &mut display,
                         &mut self.world,
                         &mut self.renderer,
+                    )).expect("Cannot execute set-up systems");
+                },
+                ContextEvent::Resize(extent) => {
+                    self.renderer.set_extent(extent);
+                },
+                ContextEvent::Update => {
+                    update_schedule.execute((
+                        &mut self.world,
                     )).expect("Cannot execute update systems");
                 },
-                ContextEvent::RenderEvent(mut display, mut control_flow) => { 
+                ContextEvent::Render(mut display, mut control_flow) => { 
                     pre_render_schedule.execute_seq((
                         &mut display,
                         &mut control_flow,
@@ -162,7 +164,7 @@ impl Flatbox {
                         &mut self.renderer,
                     )).expect("Cannot execute post-render systems");
                 },
-                ContextEvent::WindowEvent(display, event) => {
+                ContextEvent::Window(display, event) => {
                     if on_window_event(&mut self.world, event) {
                         display.lock().window().request_redraw();
                     }

@@ -17,7 +17,6 @@ lz4 = "1.24.0"
 parking_lot = { version = "0.12.0", features = ["serde"] }
 pretty-type-name = "1.0.1"
 ron = "0.8.1"
-slotmap = { version = "1.0.6", features = ["serde"] }
 serde = { version = "1.0.188", features = ["derive", "rc"] }
 thiserror = "1.0.49"
 typetag = "0.2.13"

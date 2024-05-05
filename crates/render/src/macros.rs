@@ -11,7 +11,7 @@ macro_rules! glenum_wrapper {
         #[allow(unused_imports)]
         use ::gl::*;
 
-        #[derive(Clone, Copy, Debug)]
+        #[derive(Clone, Copy, Debug, PartialEq, ::serde::Serialize, ::serde::Deserialize)]
         #[repr(u32)]
         pub enum $wrapper {
             $(

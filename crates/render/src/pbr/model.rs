@@ -24,6 +24,8 @@ pub struct Model {
     pub mesh: Option<Mesh>,
 }
 
+// TODO: load .obj 
+
 impl Model {
     pub fn new(mesh_type: MeshType, mesh: Mesh) -> Model {
         Model {

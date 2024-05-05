@@ -2,8 +2,6 @@ use as_any::AsAny;
 use flatbox_core::math::transform::Transform;
 use flatbox_ecs::{Component, EntityBuilder};
 
-use crate::AssetHandle;
-
 #[typetag::serde(tag = "component")]
 pub trait SerializableComponent: Component + AsAny {
     fn add_into(&self, entity_builder: &mut EntityBuilder);
@@ -43,5 +41,5 @@ macro_rules! impl_ser_component {
 
 impl_ser_component!(
     bool, u8, i8, u16, i16, u32, i32, u64, i64, usize, isize,
-    AssetHandle, Transform
+    Transform
 );

@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+pub use paste::paste;
+
 pub use hecs::{
     *,
     serialize::column::{
@@ -60,4 +62,24 @@ impl Schedules {
     pub fn flush_systems(&mut self, system_stage: SystemStage) {
         self.schedules.get_mut(&system_stage).unwrap().flush();
     }
+}
+
+#[macro_export]
+macro_rules! single {
+    ($world:ident, $state:ident => $query:ty) => {
+        $crate::paste! {
+            let mut [<$state _query>] = $world.query::<$query>();
+            
+            let count = [<$state _query>].iter().len();
+            if count != 1 {
+                panic!("Entity `{}` is not single! Count is `{}`", stringify!($query), count);
+            }
+
+            let mut $state = [<$state _query>]
+                .iter()
+                .map(|(_, s)| {s})
+                .next()
+                .unwrap();
+        }
+    };
 }

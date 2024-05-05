@@ -15,4 +15,5 @@ flatbox_core = { version = "0.2.0", path = "../core" }
 hecs = { package = "despero-hecs", version = "0.9.1-f", features = ["macros", "column-serialize"] }
 hecs-schedule = { package = "despero-hecs-schedule", version = "0.6.2"}
 parking_lot = { version = "0.12.0", features = ["serde"] }
+paste = "1.0.14"
 pretty-type-name = "1.0.1"

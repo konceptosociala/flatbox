@@ -1,12 +1,7 @@
 use std::{time::{Instant, Duration}, sync::Arc, fmt::Debug};
 use flatbox_core::logger::LoggerLevel;
 use glutin::{
-    platform::run_return::EventLoopExtRunReturn,
-    event_loop::{EventLoop, ControlFlow as WinitControlFlow, EventLoopWindowTarget}, 
-    window::{Window, Icon, WindowBuilder as GlutinWindowBuilder},
-    dpi::{Size, LogicalSize, PhysicalSize},
-    event::Event,
-    ContextWrapper, PossiblyCurrent, ContextBuilder, GlRequest, Api, 
+    dpi::{LogicalSize, PhysicalSize, Size}, event::Event, event_loop::{ControlFlow as WinitControlFlow, EventLoop, EventLoopWindowTarget}, platform::run_return::EventLoopExtRunReturn, window::{Fullscreen, Icon, Window, WindowBuilder as GlutinWindowBuilder}, Api, ContextBuilder, ContextWrapper, GlRequest, PossiblyCurrent 
 };
 use parking_lot::{Mutex, MutexGuard};
 use crate::renderer::WindowExtent;
@@ -25,6 +20,13 @@ impl Display {
 
         #[allow(clippy::arc_with_non_send_sync)]
         Display(Arc::new(Mutex::new(context)))
+    }
+
+    pub fn set_fullscreen(&self, fullscreen: bool) {
+        self.lock().window().set_fullscreen(match fullscreen {
+            true => Some(Fullscreen::Borderless(None)),
+            false => None,
+        });
     }
 
     pub fn lock(&self) -> MutexGuard<GlContext> {
@@ -124,10 +126,11 @@ impl AsRef<EventLoop<()>> for EventLoopWrapper {
 }
 
 pub enum ContextEvent {
-    ResizeEvent(WindowExtent),
-    UpdateEvent,
-    RenderEvent(Display, ControlFlow),
-    WindowEvent(Display, WindowEvent<'static>),
+    Setup(Display),
+    Resize(WindowExtent),
+    Update,
+    Render(Display, ControlFlow),
+    Window(Display, WindowEvent<'static>),
 }
 
 pub struct Context {
@@ -218,7 +221,7 @@ impl Context {
         self.accumulated_time += elapsed.as_secs_f64();
 
         while self.accumulated_time >= self.fixed_time_step {
-            (runner)(ContextEvent::UpdateEvent);
+            (runner)(ContextEvent::Update);
 
             self.accumulated_time -= self.fixed_time_step;
             self.number_of_updates += 1;
@@ -229,7 +232,7 @@ impl Context {
         if self.window_occluded {
             std::thread::sleep(Duration::from_secs_f64(self.fixed_time_step));
         } else {
-            (runner)(ContextEvent::RenderEvent(
+            (runner)(ContextEvent::Render(
                 self.display.clone(), 
                 self.control_flow.clone(),
             ));
@@ -241,6 +244,8 @@ impl Context {
     }
 
     pub fn run<F: FnMut(ContextEvent)>(&mut self, mut runner: F) {
+        (runner)(ContextEvent::Setup(self.display.clone()));
+
         self.event_loop.take().run_return(move |event, _, control_flow|{
             match event {
                 Event::LoopDestroyed => (),
@@ -249,14 +254,14 @@ impl Context {
                         WindowEvent::CloseRequested => *control_flow = WinitControlFlow::Exit,
                         WindowEvent::Resized(physical_size) => {
                             let size = WindowExtent::from(physical_size);
-                            (runner)(ContextEvent::ResizeEvent(size));
+                            (runner)(ContextEvent::Resize(size));
                             self.display.lock().resize(physical_size);
                         },
                         WindowEvent::Occluded(occluded) => self.window_occluded = occluded,
                         _ => {},
                     }
 
-                    (runner)(ContextEvent::WindowEvent(
+                    (runner)(ContextEvent::Window(
                         self.display.clone(),
                         event.to_static().unwrap_or(WindowEvent::Focused(true)), 
                     ));
