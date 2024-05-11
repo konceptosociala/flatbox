@@ -14,6 +14,7 @@ use flatbox::{
 };
 use flatbox_ecs::{query::Mut, Read, SubWorld, SystemStage::*};
 use flatbox_egui::backend::EguiBackend;
+use flatbox_render::pbr::model::ModelBundle;
 
 fn main() {
     Flatbox::init(WindowBuilder {
@@ -29,15 +30,20 @@ fn main() {
 }
 
 fn setup(mut cmd: Write<CommandBuffer>) -> Result<()> {
-    cmd.spawn((
-        Model::cube(), 
-        DefaultMaterial {
+    use std::io::Write as _;
+    let model = Model::load_obj("/home/oleksandrhnutov/Стільниця/ico.obj")?.into_iter().next().unwrap();
+    let mut w = std::fs::File::create("ico").unwrap();
+    writeln!(&mut w, "{model:#?}").unwrap();
+    
+    cmd.spawn(ModelBundle{
+        model,
+        material: DefaultMaterial {
             diffuse_map: Texture::new("assets/crate.png", None)?,
             specular_map: Texture::new("assets/crate_spec.png", None)?,
             ..Default::default()
         },
-        Transform::new_from_translation(glm::vec3(2.0, 0.0, 0.0)),
-    ));
+        transform: Transform::new_from_translation(glm::vec3(2.0, 0.0, 0.0)),
+    });
 
     cmd.spawn((
         Model::cube(), 

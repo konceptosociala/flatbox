@@ -1,14 +1,13 @@
-use std::{path::PathBuf, sync::Arc};
+use std::{borrow::Cow, fmt::Debug, path::{Path, PathBuf}, sync::Arc};
 use parking_lot::Mutex;
 use serde::{Serialize, Deserialize};
 use flatbox_core::math::glm;
 
 use crate::{
-    macros::set_vertex_attribute,
-    hal::{
-        buffer::{Buffer, VertexArray, BufferTarget, BufferUsage, AttributeType}, 
+    error::RenderError, hal::{
+        buffer::{AttributeType, Buffer, BufferTarget, BufferUsage, VertexArray}, 
         shader::GraphicsPipeline
-    }, 
+    }, macros::set_vertex_attribute 
 };
 
 #[allow(unused_imports)]
@@ -56,7 +55,7 @@ impl Vertex {
 pub struct Primitive {
     pub first_index: u32,
     pub index_count: u32,
-    /// Handle of material, which is attached to rendered mesh primitive
+    /// Material, which is attached to rendered mesh primitive
     pub material: Arc<Mutex<Box<dyn Material>>>,
 }
 
@@ -76,7 +75,7 @@ pub enum MeshType {
     /// Refined icosphere mesh
     Sphere,
     /// Mesh which have been loaded from file or resource
-    Loaded(PathBuf),
+    Path(PathBuf),
     /// Custom model type, which neither loaded from file, nor
     /// created in runtime. Unlike other meshes it's (de-)serialized.
     /// Use it when constructing models manually
@@ -102,7 +101,7 @@ pub struct Mesh {
 }
 
 impl Mesh {
-    pub fn new(vertices: &[Vertex], indices: &[u32], primitives: &[Primitive]) -> Mesh {
+    pub fn new(vertices: Cow<[Vertex]>, indices: Cow<[u32]>, primitives: Cow<[Primitive]>) -> Mesh {
         Mesh {
             vertex_data: vertices.to_vec(),
             index_data: indices.to_vec(),
@@ -114,13 +113,68 @@ impl Mesh {
         }
     }
 
+    pub fn load_obj<P>(path: P) -> Result<Vec<Mesh>, RenderError>
+    where 
+        P: AsRef<Path> + Debug
+    {
+        let (models, _) = tobj::load_obj(
+            path.as_ref(),
+            &tobj::LoadOptions {
+                single_index: true,
+                triangulate: true,
+                ignore_points: true,
+                ..Default::default()
+            },
+        ).map_err(|_| RenderError::ModelLoadError(path.as_ref().to_owned()))?;
+        
+        let mut meshes = Vec::<Mesh>::new();
+        
+        for m in models {
+            let mut vertex_data = Vec::<Vertex>::new();
+            let index_data = m.mesh.indices;
+            
+            for i in 0..m.mesh.positions.len() / 3 {                
+                let mut texcoord = glm::vec2(0.0, 0.0);
+                
+                let position = glm::vec3(
+                    m.mesh.positions[i*3],
+                    m.mesh.positions[i*3+1],
+                    m.mesh.positions[i*3+2],
+                );
+                
+                let normal = glm::vec3(
+                    m.mesh.normals[i*3],
+                    m.mesh.normals[i*3+1],
+                    m.mesh.normals[i*3+2],
+                );
+                
+                if i*2 < m.mesh.texcoords.len() {
+                    texcoord = glm::vec2(
+                        m.mesh.texcoords[i*2],
+                        m.mesh.texcoords[i*2+1],
+                    );
+                }
+                
+                vertex_data.push(Vertex {
+                    position,
+                    normal,
+                    texcoord,
+                });
+            }
+                        
+            meshes.push(Mesh::new(vertex_data.into(), index_data.into(), vec![].into()));
+        }
+        
+        Ok(meshes)
+     }
+
     pub fn empty() -> Mesh {
-        Mesh::new(&[], &[], &[])
+        Mesh::new(vec![].into(), vec![].into(), vec![].into())
     }
 
     pub fn cube() -> Mesh {
         Mesh::new(
-            &[
+            vec![
                 Vertex { position: glm::vec3(-0.5,0.5,-0.5), normal: glm::vec3(0.0, 0.0, -1.0), texcoord: glm::vec2(0.0, 0.0) },
                 Vertex { position: glm::vec3(-0.5,-0.5,-0.5), normal: glm::vec3(0.0, 0.0, -1.0), texcoord: glm::vec2(0.0, 1.0) },
                 Vertex { position: glm::vec3(0.5,-0.5,-0.5), normal: glm::vec3(0.0, 0.0, -1.0), texcoord: glm::vec2(1.0, 1.0) },
@@ -150,44 +204,45 @@ impl Mesh {
                 Vertex { position: glm::vec3(-0.5,-0.5,-0.5), normal: glm::vec3(0.0, -1.0, 0.0), texcoord: glm::vec2(0.0, 1.0) },
                 Vertex { position: glm::vec3(0.5,-0.5,-0.5), normal: glm::vec3(0.0, -1.0, 0.0), texcoord: glm::vec2(1.0, 1.0) },
                 Vertex { position: glm::vec3(0.5,-0.5,0.5), normal: glm::vec3(0.0, -1.0, 0.0), texcoord: glm::vec2(1.0, 0.0) },
-            ],
-            &[
+            ].into(),
+            vec![
                 0,1,3, 3,1,2,
                 4,5,7, 7,5,6,
                 8,9,11, 11,9,10,
                 12,13,15, 15,13,14,
                 16,17,19, 19,17,18,
                 20,21,23, 23,21,22
-            ],
-            &[],
+            ].into(),
+            vec![].into(),
         )
     }
 
     pub fn plane() -> Mesh {
         Mesh::new(
-            &[
-                Vertex { position: glm::vec3(-0.5,0.5,-0.5), normal: glm::vec3(0.0, 0.0, -1.0), texcoord: glm::vec2(0.0, 0.0) },
-                Vertex { position: glm::vec3(-0.5,-0.5,-0.5), normal: glm::vec3(0.0, 0.0, -1.0), texcoord: glm::vec2(0.0, 1.0) },
-                Vertex { position: glm::vec3(0.5,-0.5,-0.5), normal: glm::vec3(0.0, 0.0, -1.0), texcoord: glm::vec2(1.0, 1.0) },
-                Vertex { position: glm::vec3(0.5,0.5,-0.5), normal: glm::vec3(0.0, 0.0, -1.0), texcoord: glm::vec2(1.0, 0.0) },
-
-                Vertex { position: glm::vec3(-0.5,0.5,0.5), normal: glm::vec3(0.0, 0.0, 1.0), texcoord: glm::vec2(0.0, 0.0) },
-                Vertex { position: glm::vec3(-0.5,-0.5,0.5), normal: glm::vec3(0.0, 0.0, 1.0), texcoord: glm::vec2(0.0, 1.0) },
-                Vertex { position: glm::vec3(0.5,-0.5,0.5), normal: glm::vec3(0.0, 0.0, 1.0), texcoord: glm::vec2(1.0, 1.0) },
-                Vertex { position: glm::vec3(0.5,0.5,0.5), normal: glm::vec3(0.0, 0.0, 1.0), texcoord: glm::vec2(1.0, 0.0) },
-
-                Vertex { position: glm::vec3(0.5,0.5,-0.5), normal: glm::vec3(1.0, 0.0, 0.0), texcoord: glm::vec2(0.0, 0.0) },
-                Vertex { position: glm::vec3(0.5,-0.5,-0.5), normal: glm::vec3(1.0, 0.0, 0.0), texcoord: glm::vec2(0.0, 1.0) },
-                Vertex { position: glm::vec3(0.5,-0.5,0.5), normal: glm::vec3(1.0, 0.0, 0.0), texcoord: glm::vec2(1.0, 1.0) },
-                Vertex { position: glm::vec3(0.5,0.5,0.5), normal: glm::vec3(1.0, 0.0, 0.0), texcoord: glm::vec2(1.0, 0.0) },
-
-                Vertex { position: glm::vec3(-0.5,0.5,-0.5), normal: glm::vec3(-1.0, 0.0, 0.0), texcoord: glm::vec2(0.0, 0.0) },
-                Vertex { position: glm::vec3(-0.5,-0.5,-0.5), normal: glm::vec3(-1.0, 0.0, 0.0), texcoord: glm::vec2(0.0, 1.0) },
-                Vertex { position: glm::vec3(-0.5,-0.5,0.5), normal: glm::vec3(-1.0, 0.0, 0.0), texcoord: glm::vec2(1.0, 1.0) },
-                Vertex { position: glm::vec3(-0.5,0.5,0.5), normal: glm::vec3(-1.0, 0.0, 0.0), texcoord: glm::vec2(1.0, 0.0) },
-            ],
-            &[0,1,3, 3,1,2],
-            &[],
+            vec![
+                Vertex { 
+                    position: glm::vec3(-1.0, 1.0, 0.0), 
+                    normal: glm::vec3(0.0, 0.0, -1.0), 
+                    texcoord: glm::vec2(0.0, 0.0) 
+                },
+                Vertex { 
+                    position: glm::vec3(-1.0, -1.0, 0.0), 
+                    normal: glm::vec3(0.0, 0.0, -1.0), 
+                    texcoord: glm::vec2(0.0, 1.0) 
+                },
+                Vertex { 
+                    position: glm::vec3(1.0, -1.0, 0.0), 
+                    normal: glm::vec3(0.0, 0.0, -1.0), 
+                    texcoord: glm::vec2(1.0, 1.0) 
+                },
+                Vertex { 
+                    position: glm::vec3(1.0, 1.0, 0.0), 
+                    normal: glm::vec3(0.0, 0.0, -1.0), 
+                    texcoord: glm::vec2(1.0, 0.0) 
+                },
+            ].into(), 
+            vec![0,1,3,3,1,2].into(),
+            vec![].into(),
         )
     }
     
@@ -223,7 +278,7 @@ impl Mesh {
 
 impl Default for Mesh {
     fn default() -> Self {
-        Mesh::cube()
+        Mesh::empty()
     }
 }
 

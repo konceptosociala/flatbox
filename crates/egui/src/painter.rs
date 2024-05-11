@@ -15,7 +15,7 @@ use flatbox_render::{
         buffer::{Buffer, BufferTarget, BufferUsage, VertexArray, AttributeType}
     }, 
     error::RenderError, 
-    pbr::texture::{Filter, Texture, TextureDescriptor, WrapMode, ColorMode, ImageType, Order}, renderer::{Renderer, Capability, WindowExtent, EnableCommand, DisableCommand, ColorMaskCommand, BlendEquationSeparateCommand, ColorBlendMode, BlendFuncSeparateCommand, ColorBlendEquation, ScissorCommand, ActivateTextureRawCommand, DrawTrianglesCommand}
+    pbr::texture::{Filter, Texture, TextureDescriptor, WrapMode, ColorMode, ImageType, TextureOrder}, renderer::{Renderer, Capability, WindowExtent, EnableCommand, DisableCommand, ColorMaskCommand, BlendEquationSeparateCommand, ColorBlendMode, BlendFuncSeparateCommand, ColorBlendEquation, ScissorCommand, ActivateTextureRawCommand, DrawTrianglesCommand}
 };
 
 const VERT_SRC: &str = include_str!("shaders/egui.vs");
@@ -119,7 +119,7 @@ impl Painter {
         self.pipeline.set_vec2("u_screen_size", &glm::vec2(width_in_points, height_in_points));
         self.pipeline.set_int("u_sampler", 0);
 
-        unsafe { renderer.execute(&mut ActivateTextureRawCommand::new(Order::Texture0))?; }
+        unsafe { renderer.execute(&mut ActivateTextureRawCommand::new(TextureOrder::Texture0))?; }
 
         self.vertex_array.bind();
         self.index_buffer.bind();

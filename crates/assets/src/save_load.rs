@@ -1,17 +1,58 @@
-use flatbox_ecs::World;
+use flatbox_ecs::{serialize_world, deserialize_world, DeserializeContext, SerializeContext, World};
+use serde::{Deserialize, Serialize, Serializer};
+use std::{marker::PhantomData, path::Path};
 
-use crate::prelude::AssetError;
+use crate::{prelude::AssetError, serializer::AssetSerializer};
 
-pub trait SaveLoad {
-    fn save<P: AsRef<std::path::Path>>(
-        &mut self,
+pub struct SerializeWorld<'a, C>(&'a World, PhantomData<C>);
+
+impl<'a, C: SaveLoad> SerializeWorld<'a, C> {
+    pub fn new(world: &'a World) -> Self {
+        SerializeWorld(world, PhantomData)
+    }
+}
+
+impl<'a, C: SaveLoad> Serialize for SerializeWorld<'a, C> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer 
+    {
+        let mut ctx = C::default();
+        serialize_world(self.0, &mut ctx, serializer)
+    }
+}
+
+pub struct DeserializeWorld<C>(World, PhantomData<C>);
+
+impl<C: SaveLoad> DeserializeWorld<C> {
+    pub fn into_inner(self) -> World {
+        self.0
+    }
+}
+
+impl<'de, C: SaveLoad> Deserialize<'de> for DeserializeWorld<C> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de> 
+    {
+        let mut ctx = C::default();
+        Ok(DeserializeWorld(
+            deserialize_world(&mut ctx, deserializer)?,
+            PhantomData,
+        ))
+    }
+}
+
+pub trait SaveLoad: SerializeContext + DeserializeContext + Default {
+    fn save(
         world: &World,
-        path: P,
+        path: impl AsRef<Path>,
+        serializer: &impl AssetSerializer,
     ) -> Result<(), AssetError>;
     
-    fn load<P: AsRef<std::path::Path>>(
-        &mut self,
-        path: P,
+    fn load(
+        path: impl AsRef<Path>,
+        serializer: &impl AssetSerializer,
     ) -> Result<World, AssetError>;
 }
 
@@ -43,9 +84,11 @@ pub trait SaveLoad {
 /// fn save_world(
 ///     world: Read<World>,
 /// ) -> FlatboxResult<()> {
-///     let ws = MyWorldSaver::default();
+///     let ws = MySaveLoader::default();
 /// 
 ///     ws.save("/path/to/save", &world)?;
+/// 
+///     Ok(())
 /// }
 /// 
 /// ```
@@ -55,6 +98,11 @@ macro_rules! impl_save_load {
         loader: $ctx:ident, 
         components: [ $( $comp:ty ),+ ]
     } => {
+        #[derive(Default)]
+        pub struct $ctx {
+            components: Vec<String>,
+        }
+
         impl SerializeContext for $ctx {
             fn component_count(&self, archetype: &Archetype) -> usize {                
                 archetype.component_types()
@@ -139,52 +187,21 @@ macro_rules! impl_save_load {
         }
         
         impl SaveLoad for $ctx {
-            fn save<P: AsRef<std::path::Path>>(
-                &mut self,
+            fn save(
                 world: &World,
-                path: P,
+                path: impl AsRef<std::path::Path>,
+                serializer: &impl flatbox_assets::serializer::AssetSerializer,
             ) -> Result<(), AssetError> {
-                use std::fs::File;
-                use std::io::Cursor;
-                use ron::ser::PrettyConfig;
-
-                let mut world_buf = vec![];                    
-                let mut ser = ron::Serializer::new(&mut world_buf, Some(PrettyConfig::new()))
-                    .map_err(|e| $crate::error::RonError::from(e))?;    
-
-                serialize_world(&world, self, &mut ser)
-                    .map_err(|e| $crate::error::RonError::from(e))?;
-
-                let file = File::create(path)?;
-                let mut encoder = $crate::lz4::EncoderBuilder::new()
-                    .level(4)
-                    .build(file)?;  
-
-                std::io::copy(&mut &*world_buf, &mut encoder)?; 
-
-                Ok(encoder.finish().1?)
+                let serialize_world = SerializeWorld::<$ctx>::new(&world);
+                serializer.save(&serialize_world, path)
             }
             
-            fn load<P: AsRef<std::path::Path>>(
-                &mut self,
-                path: P,
+            fn load(
+                path: impl AsRef<std::path::Path>,
+                serializer: &impl flatbox_assets::serializer::AssetSerializer,
             ) -> Result<World, AssetError> {
-                use std::fs::File;
-                use std::io::Read;
-                use serde::Deserialize;
-
-                let package = File::open(path)?;
-                let mut decoded = $crate::lz4::Decoder::new(package)?;
-                let mut buffer = vec![];
-                decoded.read_to_end(&mut buffer)?;
-
-                let mut de = ron::Deserializer::from_bytes(&buffer)
-                    .map_err(|e| $crate::error::RonError::from(e))?;
-
-                let world = deserialize_world(self, &mut de)
-                    .map_err(|e| $crate::error::RonError::from(e))?;
-
-                Ok(world)
+                let deserialize_world = serializer.load::<DeserializeWorld<$ctx>>(path)?;
+                Ok(deserialize_world.into_inner())
             }
         }
     };

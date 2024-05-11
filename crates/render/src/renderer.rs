@@ -12,7 +12,7 @@ use pretty_type_name::pretty_type_name;
 #[cfg(feature = "context")]
 use crate::context::Context;
 use crate::glenum_wrapper;
-use crate::pbr::texture::Order;
+use crate::pbr::texture::TextureOrder;
 use crate::{
     error::RenderError,
     hal::shader::{GraphicsPipeline, Shader, ShaderType},
@@ -140,7 +140,8 @@ impl Renderer {
     }
 
     pub fn get_pipeline<M: Material>(&self) -> Result<&GraphicsPipeline, RenderError> {
-        self.graphics_pipelines.get(&TypeId::of::<M>()).ok_or(RenderError::MaterialNotBound(pretty_type_name::<M>().to_string()))
+        self.graphics_pipelines.get(&TypeId::of::<M>())
+            .ok_or(RenderError::MaterialNotBound(pretty_type_name::<M>().to_string()))
     }
 
     pub fn bind_material<M: Material>(&mut self) {
@@ -306,13 +307,13 @@ impl RenderCommand for ColorMaskCommand {
     }
 }
 
-pub struct ActivateTextureRawCommand(Order);
+pub struct ActivateTextureRawCommand(TextureOrder);
 
 impl ActivateTextureRawCommand {
     ///
     /// # Safety
     /// [`GraphicsPipeline`]'s sampler with the given order must be set via [`GraphicsPipeline::set_int`] method
-    pub unsafe fn new(order: Order) -> Self {
+    pub unsafe fn new(order: TextureOrder) -> Self {
         ActivateTextureRawCommand(order)
     } 
 }
@@ -340,6 +341,30 @@ impl RenderCommand for DrawTrianglesCommand {
     fn execute(&mut self, _: &mut Renderer) -> Result<(), RenderError> {
         unsafe { gl::DrawElements(
             gl::TRIANGLES, 
+            self.0 as i32, 
+            gl::UNSIGNED_INT, 
+            std::ptr::null()
+        ); }
+        Ok(())
+    }
+} 
+
+pub struct DrawLinesCommand(usize);
+
+impl DrawLinesCommand {
+    ///
+    /// # Safety
+    /// A valid [`VertexArray`] has to be bound
+    /// Valid index and vertex buffers have to be bound
+    pub unsafe fn new(indices_count: usize) -> Self {
+        DrawLinesCommand(indices_count)
+    }
+}
+
+impl RenderCommand for DrawLinesCommand {
+    fn execute(&mut self, _: &mut Renderer) -> Result<(), RenderError> {
+        unsafe { gl::DrawElements(
+            gl::LINES, 
             self.0 as i32, 
             gl::UNSIGNED_INT, 
             std::ptr::null()

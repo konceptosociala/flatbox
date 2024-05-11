@@ -6,7 +6,7 @@ use flatbox_core::math::glm;
 
 use crate::hal::shader::GraphicsPipeline;
 
-use super::texture::{Texture, Order};
+use super::texture::{Texture, TextureOrder};
 
 #[typetag::serde(tag = "material")]
 pub trait Material: Debug + Send + Sync + 'static {
@@ -55,10 +55,10 @@ impl Material for DefaultMaterial {
         pipeline.set_float("material.shininess", self.shininess);
 
         pipeline.set_int("material.diffuse_map", 0);
-        self.diffuse_map.activate(Order::Texture0);
+        self.diffuse_map.activate(TextureOrder::Texture0);
 
         pipeline.set_int("material.specular_map", 1);
-        self.specular_map.activate(Order::Texture1);
+        self.specular_map.activate(TextureOrder::Texture1);
 
         let point_light_positions = [
             glm::vec3( 0.7,  0.2,  2.0),

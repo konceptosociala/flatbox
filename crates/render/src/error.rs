@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use image::ImageError;
 use thiserror::Error;
 
@@ -17,4 +19,6 @@ pub enum RenderError {
     ModelNotPrepared,
     #[error("There can be only one active camera at once")]
     MultipleActiveCameras,
+    #[error("Cannot load model `{0}`")]
+    ModelLoadError(PathBuf)
 }

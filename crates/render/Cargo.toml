@@ -13,6 +13,7 @@ repository = "https://github.com/konceptosociala/flatbox"
 flatbox_assets = { version = "0.2.0", path = "../assets" }
 flatbox_core = { version = "0.2.0", path = "../core" }
 flatbox_ecs = { version = "0.2.0", path = "../ecs", optional = true }
+hecs = { package = "despero-hecs", version = "0.9.1-f", optional = true }
 
 anyhow = "1.0.75"
 bytemuck = "1.7.2"
@@ -26,9 +27,10 @@ pretty-type-name = "1.0.1"
 readonly = "0.2.11"
 serde = { version = "1.0.188", features = ["derive", "rc"] }
 thiserror = "1.0.49"
+tobj = "4.0.2"
 
 [features]
 default = ["context", "ecs"]
 
 context = ["dep:glutin"]
-ecs = ["dep:flatbox_ecs"]
+ecs = ["dep:flatbox_ecs", "dep:hecs"]

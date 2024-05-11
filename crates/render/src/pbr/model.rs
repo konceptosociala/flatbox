@@ -1,4 +1,7 @@
+use std::{fmt::Debug, path::Path};
+
 use flatbox_core::math::transform::Transform;
+use flatbox_ecs::Bundle;
 use serde::{
     Serialize, 
     Deserialize,
@@ -9,10 +12,9 @@ use serde::{
     ser::SerializeStruct,
 };
 
-use crate::pbr::{
-    mesh::{MeshType, Mesh},
-    material::Material,
-};
+use crate::{error::RenderError, pbr::{
+    material::Material, mesh::{Mesh, MeshType}
+}};
 
 #[derive(Debug, Clone)]
 #[readonly::make]
@@ -27,11 +29,24 @@ pub struct Model {
 // TODO: load .obj 
 
 impl Model {
-    pub fn new(mesh_type: MeshType, mesh: Mesh) -> Model {
+    pub fn new(mesh: Mesh) -> Model {
         Model {
-            mesh_type,
+            mesh_type: MeshType::Generic,
             mesh: Some(mesh),
         }
+    }
+
+    pub fn load_obj<P>(path: P) -> Result<Vec<Model>, RenderError>
+    where 
+        P: AsRef<Path> + Debug
+    {
+        Ok(Mesh::load_obj(path.as_ref())?
+            .into_iter()
+            .map(|mesh| Model {
+                mesh: Some(mesh),
+                mesh_type: MeshType::Path(path.as_ref().to_owned())
+            })
+            .collect::<Vec<_>>())
     }
 
     pub fn cube() -> Model {
@@ -110,10 +125,10 @@ impl<'de> Deserialize<'de> for Model {
                     MeshType::Cube => { Some(Mesh::cube()) },
                     // MeshType::Icosahedron => { Some(Mesh::icosahedron()) },
                     // MeshType::Sphere => { Some(Mesh::sphere()) },
-                    // MeshType::Plane => { Some(Mesh::plane()) },
+                    MeshType::Plane => { Some(Mesh::plane()) },
                     // MeshType::Loaded(path) => {
-                        // return Ok(Model::load_obj(path)
-                            // .expect("Cannot load deserialized model from path"));
+                    //     return Ok(Model::load_obj(path)
+                    //         .expect("Cannot load deserialized model from path"));
                     // },
                     MeshType::Generic => { 
                         seq.next_element()?.ok_or_else(|| DeError::invalid_length(1, &self))? 
@@ -183,7 +198,7 @@ impl<'de> Deserialize<'de> for Model {
     }
 }
 
-
+#[derive(Bundle)]
 pub struct ModelBundle<M: Material> {
     pub model: Model,
     pub material: M,

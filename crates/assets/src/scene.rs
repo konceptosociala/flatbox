@@ -1,12 +1,10 @@
 use std::sync::Arc;
 use std::path::Path;
-use std::fs::{File, read_to_string};
 use parking_lot::Mutex;
-use ron::ser::{Serializer, PrettyConfig};
 use serde::{Serialize, Deserialize};
 use flatbox_ecs::{World, EntityBuilder};
 
-use crate::error::RonError;
+use crate::serializer::AssetSerializer;
 use crate::{
     error::AssetError,
     ser_component::SerializableComponent,
@@ -54,22 +52,19 @@ impl Scene {
         Scene::default()
     }
     
-    pub fn load<P: AsRef<Path>>(path: P) -> Result<Self, AssetError> {     
-        Ok(ron::from_str::<Scene>(
-            &read_to_string(path)?
-        ).map_err(RonError::from)?)
+    pub fn load(
+        path: impl AsRef<Path>, 
+        serializer: impl AssetSerializer,
+    ) -> Result<Self, AssetError> {
+        serializer.load(path)
     }
     
-    pub fn save<P: AsRef<std::path::Path>>(&self, path: P) -> Result<(), AssetError> {     
-        let buf = File::create(path)?;                    
-        let mut ser = Serializer::new(buf, Some(
-            PrettyConfig::new()
-                .struct_names(true)
-        )).map_err(RonError::from)?;   
-        
-        self.serialize(&mut ser).map_err(RonError::from)?;
-                        
-        Ok(())
+    pub fn save(
+        &self,
+        path: impl AsRef<Path>, 
+        serializer: impl AssetSerializer,
+    ) -> Result<(), AssetError> {     
+        serializer.save(&self, path)
     }
 }
 

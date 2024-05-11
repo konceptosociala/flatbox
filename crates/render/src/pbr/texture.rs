@@ -1,7 +1,7 @@
 use std::{fmt::Debug, path::{Path, PathBuf}};
 use flatbox_core::logger::error;
 use gl::types::GLuint;
-use image::{EncodableLayout, ImageBuffer, Rgba, RgbaImage};
+use image::{EncodableLayout, RgbaImage};
 use serde::{
     de::{Error as DeError, MapAccess, SeqAccess, Visitor}, 
     ser::SerializeStruct, 
@@ -10,10 +10,9 @@ use serde::{
 
 use crate::{
     macros::glenum_wrapper, 
-    error::RenderError
+    error::RenderError,
+    pbr::color::Color,
 };
-
-use super::color::Color;
 
 glenum_wrapper! {
     wrapper: Filter,
@@ -41,7 +40,7 @@ glenum_wrapper! {
 }
 
 glenum_wrapper! {
-    wrapper: Order,
+    wrapper: TextureOrder,
     variants: [
         Texture0, Texture1, Texture2, Texture3,
         Texture4, Texture5, Texture6, Texture7,
@@ -147,7 +146,8 @@ impl Debug for Texture {
 
 impl Serialize for Texture {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where S: Serializer,
+    where 
+        S: Serializer
     {
         let mut texture = serializer.serialize_struct("Texture", 4)?;
         texture.serialize_field("load_type", &self.load_type)?;
@@ -398,7 +398,7 @@ impl Texture {
         Ok(texture)
     }
 
-    pub fn activate(&self, order: Order) {
+    pub fn activate(&self, order: TextureOrder) {
         unsafe { gl::ActiveTexture(order as u32); }
         self.bind();
     }
@@ -410,12 +410,8 @@ impl Texture {
 
 impl Default for Texture {
     fn default() -> Self {
-        let img = ImageBuffer::from_fn(16, 16, |_, _| Rgba::<u8>([255, 255, 255, 255])).into_raw();
-
-        Texture::new_from_raw(16, 16, &img, Some(TextureDescriptor {
-            filter: Filter::Nearest,
-            ..Default::default()
-        })).unwrap()
+        Texture::new_from_color(16, 16, Color::WHITE)
+            .expect("Cannot create texture: renderer may be not initialized")
     }
 }
 
@@ -425,14 +421,14 @@ impl Drop for Texture {
     }
 }
 
-pub fn load_image_from_memory(buf: &[u8]) -> Option<(Vec<u8>, u32, u32)> {
+pub fn load_image_from_memory(buf: &[u8]) -> Option<(u32, u32, Vec<u8>)> {
     match image::load_from_memory(buf) {
         Ok(img) => {
             let img = img.into_rgba8();
             let width = img.width();
             let height = img.height();
             
-            Some((img.into_raw(), width, height))
+            Some((width, height, img.into_raw()))
         },
         _ => None,
     }

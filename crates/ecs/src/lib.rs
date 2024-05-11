@@ -16,6 +16,8 @@ pub use hecs_schedule::{
     Access, Batch, CommandBuffer, QueryOne,
 };
 
+pub use hecs_macros::{Bundle, DynamicBundleClone, Query};
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum SystemStage {
     Setup,
