@@ -55,7 +55,7 @@ impl Vertex {
 pub struct Primitive {
     pub first_index: u32,
     pub index_count: u32,
-    /// Material, which is attached to rendered mesh primitive
+    // Material, which is attached to rendered mesh primitive
     pub material: Arc<Mutex<Box<dyn Material>>>,
 }
 

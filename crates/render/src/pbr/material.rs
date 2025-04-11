@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 
 use serde::{Serialize, Deserialize};
-use flatbox_assets::typetag;
+use flatbox_assets::{impl_ser_component, typetag};
 use flatbox_core::math::glm;
 
 use crate::hal::shader::GraphicsPipeline;
@@ -123,3 +123,4 @@ impl Material for DefaultMaterial {
     }
 }
 
+impl_ser_component!(DefaultMaterial);

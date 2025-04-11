@@ -442,7 +442,7 @@ macro_rules! include_texture {
             let img = $crate::pbr::texture::load_image_from_memory(buf)
                 .expect(format!("Cannot load `{}`", $file).as_str());
             
-            Texture::new_from_raw(&img.0, img.1, img.2, None)
+            Texture::new_from_raw(img.0, img.1, &img.2, None)
                 .expect(format!("Cannot create texture from `{}`", $file).as_str())
         }
     };

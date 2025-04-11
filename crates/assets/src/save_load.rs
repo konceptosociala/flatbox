@@ -1,4 +1,6 @@
-use flatbox_ecs::{serialize_world, deserialize_world, DeserializeContext, SerializeContext, World};
+use flatbox_ecs::{
+    deserialize_world, serialize_world, DeserializeContext, SerializeContext, World,
+};
 use serde::{Deserialize, Serialize, Serializer};
 use std::{marker::PhantomData, path::Path};
 
@@ -14,8 +16,8 @@ impl<'a, C: SaveLoad> SerializeWorld<'a, C> {
 
 impl<'a, C: SaveLoad> Serialize for SerializeWorld<'a, C> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: Serializer 
+    where
+        S: Serializer,
     {
         let mut ctx = C::default();
         serialize_world(self.0, &mut ctx, serializer)
@@ -32,8 +34,8 @@ impl<C: SaveLoad> DeserializeWorld<C> {
 
 impl<'de, C: SaveLoad> Deserialize<'de> for DeserializeWorld<C> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: serde::Deserializer<'de> 
+    where
+        D: serde::Deserializer<'de>,
     {
         let mut ctx = C::default();
         Ok(DeserializeWorld(
@@ -49,53 +51,51 @@ pub trait SaveLoad: SerializeContext + DeserializeContext + Default {
         path: impl AsRef<Path>,
         serializer: &impl AssetSerializer,
     ) -> Result<(), AssetError>;
-    
-    fn load(
-        path: impl AsRef<Path>,
-        serializer: &impl AssetSerializer,
-    ) -> Result<World, AssetError>;
+
+    fn load(path: impl AsRef<Path>, serializer: &impl AssetSerializer)
+        -> Result<World, AssetError>;
 }
 
-/// Macro that is used to create custom [`SaveLoad`]ers, 
+/// Macro that is used to create custom [`SaveLoad`]ers,
 /// that are capable of saving and loading individual serializable
 /// components from the [`World`]
-/// 
+///
 /// # Usage example
-/// 
-/// ```rust 
+///
+/// ```rust
 /// #[derive(Serialize, Deserialize)]
 /// struct MyComponent(u32);
-/// 
+///
 /// #[derive(Default)]
 /// struct MySaveLoader {
 ///     components: Vec<String>, // required field
 /// }
-/// 
+///
 /// impl_save_load! {
-///     loader: MySaveLoader, 
+///     loader: MySaveLoader,
 ///     components: [
-///         Camera, 
-///         Timer, 
+///         Camera,
+///         Timer,
 ///         Transform,
 ///         MyComponent
 ///     ]
 /// }
-/// 
+///
 /// fn save_world(
 ///     world: Read<World>,
 /// ) -> FlatboxResult<()> {
 ///     let ws = MySaveLoader::default();
-/// 
+///
 ///     ws.save("/path/to/save", &world)?;
-/// 
+///
 ///     Ok(())
 /// }
-/// 
+///
 /// ```
 #[macro_export]
 macro_rules! impl_save_load {
     {
-        loader: $ctx:ident, 
+        loader: $ctx:ident,
         components: [ $( $comp:ty ),+ ]
     } => {
         #[derive(Default)]
@@ -104,7 +104,7 @@ macro_rules! impl_save_load {
         }
 
         impl SerializeContext for $ctx {
-            fn component_count(&self, archetype: &Archetype) -> usize {                
+            fn component_count(&self, archetype: &Archetype) -> usize {
                 archetype.component_types()
                     .filter(|&t|
                         $(
@@ -114,7 +114,7 @@ macro_rules! impl_save_load {
                     )
                     .count()
             }
-            
+
             fn serialize_component_ids<S: serde::ser::SerializeTuple>(
                 &mut self,
                 archetype: &Archetype,
@@ -123,10 +123,10 @@ macro_rules! impl_save_load {
                 $(
                     try_serialize_id::<$comp, _, _>(archetype, stringify!($comp), &mut out)?;
                 )*
-                
+
                 out.end()
             }
-            
+
             fn serialize_components<S: serde::ser::SerializeTuple>(
                 &mut self,
                 archetype: &Archetype,
@@ -135,11 +135,11 @@ macro_rules! impl_save_load {
                 $(
                     try_serialize::<$comp, _>(archetype, &mut out)?;
                 )*
-                
+
                 out.end()
             }
         }
-        
+
         impl DeserializeContext for $ctx {
             fn deserialize_component_ids<'de, A: serde::de::SeqAccess<'de>>(
                 &mut self,
@@ -148,21 +148,21 @@ macro_rules! impl_save_load {
                 self.components.clear();
                 let mut batch = ColumnBatchType::new();
                 while let Some(id) = seq.next_element::<String>()? {
-                    match id.as_str() {                        
-                        $(                            
+                    match id.as_str() {
+                        $(
                             stringify!($comp) => {
                                 batch.add::<$comp>();
                             }
                         )*
-                        
+
                         _ => {},
                     }
                     self.components.push(id);
                 }
-                
+
                 Ok(batch)
             }
-            
+
             fn deserialize_components<'de, A: serde::de::SeqAccess<'de>>(
                 &mut self,
                 entity_count: u32,
@@ -171,21 +171,21 @@ macro_rules! impl_save_load {
             ) -> Result<(), A::Error> {
                 for component in &self.components {
                     match component.as_str() {
-                        $(                            
+                        $(
                             stringify!($comp) => {
                                 deserialize_column::<$comp, _>(entity_count, &mut seq, batch)?;
                             }
                         )*
-                        
+
                         _ => {},
                     }
                 }
-                
+
                 Ok(())
             }
 
         }
-        
+
         impl SaveLoad for $ctx {
             fn save(
                 world: &World,
@@ -195,7 +195,7 @@ macro_rules! impl_save_load {
                 let serialize_world = SerializeWorld::<$ctx>::new(&world);
                 serializer.save(&serialize_world, path)
             }
-            
+
             fn load(
                 path: impl AsRef<std::path::Path>,
                 serializer: &impl flatbox_assets::serializer::AssetSerializer,

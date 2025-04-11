@@ -1,5 +1,6 @@
 use std::{fmt::Debug, path::Path};
 
+use flatbox_assets::{impl_ser_component, typetag};
 use flatbox_core::math::transform::Transform;
 use flatbox_ecs::Bundle;
 use serde::{
@@ -67,7 +68,7 @@ impl Model {
 impl Default for Model {
     fn default() -> Self {
         Model {
-            mesh_type: MeshType::default(),
+            mesh_type: MeshType::Generic,
             mesh: Some(Mesh::default()),
         }
     }
@@ -204,3 +205,5 @@ pub struct ModelBundle<M: Material> {
     pub material: M,
     pub transform: Transform,
 }
+
+impl_ser_component!(Model);

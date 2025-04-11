@@ -13,7 +13,7 @@ use crate::{
 #[derive(Default, Serialize, Deserialize)]
 #[serde(rename = "Entity")]
 pub struct SerializableEntity {
-    pub components: Vec<Arc<Mutex<Box<dyn SerializableComponent + 'static>>>>
+    pub components: Vec<Arc<Mutex<Box<dyn SerializableComponent>>>>
 }
 
 /// Macro for easy [`SerializableEntity`] creation. Often used along with

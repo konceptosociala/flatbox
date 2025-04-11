@@ -31,19 +31,19 @@ fn main() {
 
 fn setup(mut cmd: Write<CommandBuffer>) -> Result<()> {
     use std::io::Write as _;
-    let model = Model::load_obj("/home/oleksandrhnutov/Стільниця/ico.obj")?.into_iter().next().unwrap();
-    let mut w = std::fs::File::create("ico").unwrap();
-    writeln!(&mut w, "{model:#?}").unwrap();
+    // let model = Model::load_obj("/home/oleksandrhnutov/Стільниця/ico.obj")?.into_iter().next().unwrap();
+    // let mut w = std::fs::File::create("ico").unwrap();
+    // writeln!(&mut w, "{model:#?}").unwrap();
     
-    cmd.spawn(ModelBundle{
-        model,
-        material: DefaultMaterial {
-            diffuse_map: Texture::new("assets/crate.png", None)?,
-            specular_map: Texture::new("assets/crate_spec.png", None)?,
-            ..Default::default()
-        },
-        transform: Transform::new_from_translation(glm::vec3(2.0, 0.0, 0.0)),
-    });
+    // cmd.spawn(ModelBundle{
+    //     model,
+    //     material: DefaultMaterial {
+    //         diffuse_map: Text`ure::new("assets/crate.png", None)?,
+    //         specular_map: Texture::new("assets/crate_spec.png", None)?,
+    //         ..Default::default()
+    //     },
+    //     transform: Transform::new_from_translation(glm::vec3(2.0, 0.0, 0.0)),
+    // });
 
     cmd.spawn((
         Model::cube(), 

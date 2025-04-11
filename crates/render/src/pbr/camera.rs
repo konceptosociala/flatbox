@@ -1,5 +1,6 @@
 use std::f32::consts::FRAC_PI_3;
 
+use flatbox_assets::{impl_ser_component, typetag};
 use serde::{Serialize, Deserialize};
 use flatbox_core::{
     math::{
@@ -160,3 +161,5 @@ impl CameraBuilder {
         self
     }
 }
+
+impl_ser_component!(Camera);
